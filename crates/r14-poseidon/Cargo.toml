@@ -1,0 +1,12 @@
+[package]
+name = "r14-poseidon"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+r14-types = { workspace = true, features = ["std"] }
+ark-ff = { workspace = true }
+ark-bls12-381 = { workspace = true }
+ark-crypto-primitives = { workspace = true }
+ark-std = { workspace = true }

@@ -1,0 +1,23 @@
+[package]
+name = "r14-circuit"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+r14-types = { workspace = true, features = ["std"] }
+r14-poseidon = { workspace = true }
+ark-ff = { workspace = true }
+ark-ec = { workspace = true }
+ark-bls12-381 = { workspace = true }
+ark-groth16 = { workspace = true }
+ark-r1cs-std = { workspace = true }
+ark-relations = { workspace = true }
+ark-snark = { workspace = true }
+ark-serialize = { workspace = true }
+ark-std = { workspace = true }
+ark-crypto-primitives = { workspace = true }
+rand = { workspace = true }
+
+[dependencies.hex]
+workspace = true

@@ -1,0 +1,15 @@
+[package]
+name = "r14-types"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[features]
+default = []
+std = []
+
+[dependencies]
+ark-ff = { workspace = true }
+ark-bls12-381 = { workspace = true }
+ark-serialize = { workspace = true }
+ark-std = { workspace = true }

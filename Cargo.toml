@@ -1,0 +1,64 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/r14-types",
+    "crates/r14-kernel",
+    "crates/r14-poseidon",
+    "crates/r14-circuit",
+    "crates/r14-indexer",
+    "crates/r14-cli",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+
+[workspace.dependencies]
+# Shared
+r14-types = { path = "crates/r14-types" }
+r14-poseidon = { path = "crates/r14-poseidon" }
+r14-circuit = { path = "crates/r14-circuit" }
+
+# Soroban
+soroban-sdk = "25.1.1"
+soroban-token-sdk = "25.1.1"
+
+# Arkworks (BLS12-381)
+ark-ff = "0.5"
+ark-ec = "0.5"
+ark-bls12-381 = "0.5"
+ark-groth16 = "0.5"
+ark-r1cs-std = "0.5"
+ark-relations = "0.5"
+ark-snark = "0.5"
+ark-serialize = "0.5"
+ark-std = "0.5"
+ark-crypto-primitives = { version = "0.5", features = ["sponge", "r1cs"] }
+
+# Async / Server
+tokio = { version = "1", features = ["full"] }
+axum = "0.8"
+reqwest = { version = "0.13.2", features = ["json"] }
+
+# Storage
+rusqlite = { version = "0.38.0", features = ["bundled"] }
+
+# CLI
+clap = { version = "4", features = ["derive"] }
+
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+hex = "0.4"
+rand = "0.10.0"
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+strip = true
+
+[profile.release-with-logs]
+inherits = "release"
+debug-assertions = true

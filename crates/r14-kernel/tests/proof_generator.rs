@@ -25,6 +25,11 @@ struct DummyCircuit {
     y: Fr,
 }
 
+
+impl DummyCircuit {
+    
+}
+
 impl ConstraintSynthesizer<Fr> for DummyCircuit {
     fn generate_constraints(self, cs: ConstraintSystemRef<Fr>) -> Result<(), SynthesisError> {
         use ark_relations::r1cs::Variable;

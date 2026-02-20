@@ -2,16 +2,17 @@
 
 **Soroban smart contract for on-chain Groth16 proof verification**
 
-## Current Status: Phase 2 - SHIPPED
+## Current Status: Phase 3 - SHIPPED
 
-**Testnet:** `CDAXRSKM4VL4MPP7KNPNRDGEU6BWC4KXVXGT4RZ5TNHSQXHJCV3KVGMZ`
-**WASM:** 11.8KB optimized | **Tests:** 9 passing
+**Testnet:** `CDV6FRX7GFHZIRYB474LNW4325V7HYHD6WXBDHW4C2XEMCYPT4NF3GPN`
+**WASM:** 10.3KB | **Tests:** 9 passing
 
 ### Entrypoints
 
 | Function | Purpose |
 |----------|---------|
 | `init(vk)` | Store verification key (one-time) |
+| `deposit(cm)` | Accept commitment, emit deposit event |
 | `transfer(proof, old_root, nullifier, cm_0, cm_1)` | Verify transfer + mark nullifier spent |
 | `verify_proof(vk, proof, inputs)` | Generic Groth16 verifier |
 | `verify_dummy_proof()` | Phase 0 hardcoded test |
@@ -33,6 +34,9 @@
 │  init(vk)                                                │
 │    └─► store VK in persistent storage                    │
 │                                                          │
+│  deposit(cm: BytesN<32>)                                 │
+│    └─► emit ("deposit", (cm,)) event for indexer         │
+│                                                          │
 │  transfer(proof, old_root, nullifier, cm_0, cm_1)        │
 │    ├─► load VK from storage                              │
 │    ├─► check nullifier not spent                         │
@@ -41,7 +45,7 @@
 │    │     ├─► L = IC[0] + g1_msm(IC[1..], inputs)        │
 │    │     └─► pairing_check(4 pairs)                      │
 │    ├─► mark nullifier spent                              │
-│    └─► emit transfer event                               │
+│    └─► emit ("transfer", (nullifier, cm_0, cm_1)) event  │
 │                                                          │
 └──────────────────────────────────────────────────────────┘
 ```
@@ -51,7 +55,7 @@
 ```
 src/
 ├── lib.rs              # Module exports, #![no_std]
-├── contract.rs         # R14Kernel: init, transfer, verify_proof, verify_dummy_proof
+├── contract.rs         # R14Kernel: init, deposit, transfer, verify_proof, verify_dummy_proof
 ├── verifier.rs         # verify_groth16() — pairing equation check
 ├── types.rs            # VerificationKey, Proof (#[contracttype])
 ├── test_vectors.rs     # Hardcoded Phase 0 hex constants
@@ -99,16 +103,21 @@ e(A, B) · e(-L, gamma) · e(-C, delta) · e(-alpha, beta) = 1
 
 Where `L = IC[0] + Σ(IC[i] · public_input[i-1])` for i=1..n
 
-## Serialization Notes
+## Build
 
-- G1/G2: arkworks uncompressed → big-endian Zcash format, direct pass-through
-- Fr: arkworks LE → reverse bytes → Soroban BE (`Fr::from_bytes` uses `U256::from_be_bytes`)
+```bash
+stellar contract build --package r14-kernel
+# Output: target/wasm32v1-none/release/r14_kernel.wasm (10.3KB)
+```
+
+Note: uses `stellar contract build` (not raw `cargo build`) to target `wasm32v1-none` correctly.
 
 ## Known Issues
 
 - `publish()` deprecated — migrate to `#[contractevent]`
 - No admin auth on `init()`
 - No storage TTL / `extend_ttl()`
+- No on-chain Merkle root tracking — contract trusts `old_root` from caller
 
 ## License
 

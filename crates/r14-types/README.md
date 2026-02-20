@@ -2,92 +2,55 @@
 
 **Shared type definitions for Root14 privacy protocol**
 
-## Purpose
+## Status: SHIPPED
 
-r14-types provides common data structures used across the Root14 ecosystem:
-- On-chain contract (r14-kernel)
-- Off-chain circuit (r14-circuit)
-- Client libraries (r14-cli)
-- Indexer (r14-indexer)
+**Tests:** 2 passing | `no_std` by default, `std` feature for off-chain
 
-## Current Status: Phase 0 - Placeholder
-
-### Planned Types
+## Types
 
 ```rust
-// Core privacy primitives
+// Keys
+pub struct SecretKey(pub Fr);      // Random BLS12-381 scalar
+pub struct OwnerHash(pub Fr);      // Poseidon(sk) — public identifier
+
+// Notes (UTXO)
 pub struct Note {
-    pub value: u64,
-    pub asset: AssetId,
-    pub owner_pk: PublicKey,
-    pub randomness: Fr,
+    pub value: u64,                // Amount
+    pub app_tag: u32,              // Asset identifier
+    pub owner: Fr,                 // Owner hash
+    pub nonce: Fr,                 // Random blinding factor
 }
 
-pub struct Nullifier(pub Fr);
-
-pub struct Commitment(pub Fr);
-
-// Key management
-pub struct ViewingKey(pub Fr);
-pub struct SpendingKey(pub Fr);
-pub struct PublicKey(pub G1Affine);
+// Nullifiers
+pub struct Nullifier(pub Fr);      // Poseidon(sk, nonce) — spend proof
 
 // Merkle tree
-pub struct MerkleProof {
-    pub path: Vec<Fr>,
-    pub indices: Vec<bool>,
+pub struct MerklePath {
+    pub siblings: Vec<Fr>,         // 20 sibling hashes
+    pub indices: Vec<bool>,        // 20 direction bits
 }
-
-// Poseidon
-pub struct PoseidonConfig {
-    pub rounds_full: usize,
-    pub rounds_partial: usize,
-    pub alpha: u64,
-}
+pub struct MerkleRoot(pub Fr);
+pub const MERKLE_DEPTH: usize = 20;  // 1M leaf capacity
 ```
 
-## Implementation Status
-
-- [ ] Note structure
-- [ ] Nullifier/Commitment types
-- [ ] Key derivation helpers
-- [ ] Merkle proof types
-- [ ] Poseidon config
-- [ ] Serialization traits
-
-## Dependencies
-
-```toml
-soroban-sdk = "25.1.1"  # For on-chain types
-serde = "1"             # For off-chain serialization
-```
-
-## Usage (Future)
+## Usage
 
 ```rust
-use r14_types::{Note, Nullifier, Commitment};
+use r14_types::{Note, SecretKey, MerklePath, MERKLE_DEPTH};
 
-// Create note
-let note = Note {
-    value: 1000,
-    asset: AssetId::native(),
-    owner_pk: recipient_pk,
-    randomness: Fr::random(),
-};
-
-// Compute commitment
-let commitment = note.commit();
-
-// Compute nullifier
-let nullifier = note.nullify(&spending_key);
+let sk = SecretKey::random(&mut rng);
+let note = Note::new(1000, 1, owner_hash, &mut rng);
+let note_with_nonce = Note::with_nonce(1000, 1, owner_hash, specific_nonce);
 ```
 
-## Next Steps
+## Features
 
-- [ ] Define core types (Phase 0 GO confirmed)
-- [ ] Align with r14-circuit requirements
-- [ ] Add tests for serialization
-- [ ] Document encoding formats
+- `default` — `no_std` (for on-chain / WASM)
+- `std` — enables standard library (for CLI, indexer, tests)
+
+## Used By
+
+All crates in the workspace: r14-circuit, r14-poseidon, r14-cli, r14-indexer, r14-kernel (dev-deps only).
 
 ## License
 

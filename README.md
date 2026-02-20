@@ -2,7 +2,7 @@
 
 **Privacy-preserving transactions on Stellar using Groth16 zero-knowledge proofs**
 
-> **Phase 2 — Circuit + Kernel Integration**: Production transfer circuit (7,638 constraints) verified on-chain. E2E: off-chain prove → on-chain verify.
+> **Phase 3 — CLI + Indexer + Live E2E**: Full deposit → transfer → balance flow working on Stellar testnet. 30 tests passing.
 
 ## Overview
 
@@ -11,6 +11,8 @@ Root14 brings private transactions to Stellar through:
 - **Soroban smart contract** for on-chain verification
 - **UTXO model** with encrypted notes
 - **Merkle tree** commitment tracking
+- **CLI** for key management, deposits, transfers, balance
+- **Indexer** for blockchain event scanning + Merkle tree rebuild
 
 Users can transfer assets privately without revealing amounts, senders, or receivers.
 
@@ -21,29 +23,28 @@ Users can transfer assets privately without revealing amounts, senders, or recei
 │                    Root14 System                        │
 ├─────────────────────────────────────────────────────────┤
 │                                                         │
-│  ┌──────────────┐                  ┌────────────────┐   │
-│  │   Client     │                  │  r14-kernel    │   │
-│  │  (r14-cli)   │ ─── proof ────►  │  (Soroban)     │   │
-│  └──────────────┘                  └────────────────┘ 
-│
-│         │                                   │           │
-│         │ generate                          │ verify    │
-│         ▼                                   ▼           │
+│  ┌──────────────┐                  ┌────────────────┐  │
+│  │   Client     │                  │  r14-kernel    │  │
+│  │  (r14-cli)   │ ─── proof ────►  │  (Soroban)     │  │
+│  └──────────────┘                  └────────────────┘  │
+│         │                                   │          │
+│         │ generate                          │ verify   │
+│         ▼                                   ▼          │
 │  ┌──────────────┐                  ┌────────────────┐  │
 │  │  r14-circuit │                  │  BLS12-381     │  │
 │  │  (arkworks)  │                  │  host funcs    │  │
 │  └──────────────┘                  └────────────────┘  │
-│         │                                               │
-│         │ uses                                          │
-│         ▼                                               │
+│         │                                              │
+│         │ uses                                         │
+│         ▼                                              │
 │  ┌──────────────┐    ┌──────────────┐                  │
 │  │ r14-poseidon │    │  r14-types   │                  │
 │  │   (hash)     │    │   (shared)   │                  │
 │  └──────────────┘    └──────────────┘                  │
 │                                                         │
 │  ┌──────────────────────────────────────────────────┐  │
-│  │              r14-indexer                         │  │
-│  │  (Scan blockchain, decrypt notes)                │  │
+│  │              r14-indexer                          │  │
+│  │  Event watcher → Merkle tree → REST API          │  │
 │  └──────────────────────────────────────────────────┘  │
 │                                                         │
 └─────────────────────────────────────────────────────────┘
@@ -54,24 +55,27 @@ Users can transfer assets privately without revealing amounts, senders, or recei
 ```
 r14-dev/
 ├── crates/
-│   ├── r14-kernel/         # ✅ Soroban contract (verifier + transfer)
+│   ├── r14-kernel/         # ✅ Soroban contract (verifier + deposit + transfer)
 │   ├── r14-types/          # ✅ Shared types (Note, Nullifier, Keys, Merkle)
 │   ├── r14-poseidon/       # ✅ Poseidon hash (commitment, nullifier, owner)
 │   ├── r14-circuit/        # ✅ Off-chain proof generation (7,638 constraints)
-│   ├── r14-indexer/        # 📦 Blockchain scanner
-│   └── r14-cli/            # 📦 User CLI tool
+│   ├── r14-indexer/        # ✅ Event watcher + Merkle tree + REST API
+│   └── r14-cli/            # ✅ CLI: keygen, deposit, transfer, balance, init-contract
 │
-├── scripts/
-│   └── deploy_phase0.sh    # Testnet deployment helper
+├── docs and benchmarks/
+│   ├── tech.md                         # Technical specification
+│   ├── PHASE0_STATUS.md                # Phase 0 status (historical)
+│   ├── PHASE0_RESULTS.md               # Early testnet results (historical)
+│   ├── PHASE2_STATUS.md                # Phase 2 status
+│   └── TESTNET_DEPLOYMENT_SUMMARY.md   # All testnet deployments
 │
-├── tech.md                 # Technical specification
-├── PHASE0_STATUS.md        # Current implementation status
+├── tasks/
+│   ├── todo.md             # Task tracker
+│   ├── milestones.md       # Hackathon milestones
+│   └── lessons.md          # Debugging lessons
+│
 └── README.md               # This file
 ```
-
-**Legend:**
-- ✅ Shipped
-- 📦 Placeholder
 
 ## Quick Start
 
@@ -84,75 +88,76 @@ rustup target add wasm32-unknown-unknown
 # Stellar CLI
 cargo install --locked stellar-cli
 
-# Configure network
+# Configure network + identity
 stellar network add \
   --global testnet \
   --rpc-url https://soroban-testnet.stellar.org:443 \
   --network-passphrase "Test SDF Network ; September 2015"
+stellar keys generate test-r14 --network testnet
 ```
 
-### Build
+### Build & Test
 
 ```bash
-# Build all crates
-cargo build --release
+# Run all tests (30 tests)
+cargo test --workspace
 
 # Build contract WASM
-cargo build --target wasm32-unknown-unknown --release --package r14-kernel
+stellar contract build --package r14-kernel
 ```
 
-### Test
+### Deploy & Run E2E
 
 ```bash
-# Generate test proof (off-chain)
-cargo test --test proof_generator -- --nocapture
-
-# Run contract tests
-cargo test --package r14-kernel
-
-# Run all tests
-cargo test --workspace
-```
-
-### Deploy (Phase 0)
-
-```bash
-# Deploy contract
+# 1. Deploy contract
 stellar contract deploy \
-  --wasm target/wasm32-unknown-unknown/release/r14_kernel.wasm \
-  --network testnet \
-  --source <YOUR_ACCOUNT>
+  --wasm target/wasm32v1-none/release/r14_kernel.wasm \
+  --network testnet --source test-r14
+# → returns CONTRACT_ID
 
-# Test verification
-stellar contract invoke \
-  --id <CONTRACT_ID> \
-  --network testnet \
-  -- verify_dummy_proof
+# 2. Generate wallet
+cargo run -p r14-cli -- keygen
+# Edit ~/.r14/wallet.json: set stellar_secret + contract_id
+
+# 3. Initialize VK on contract
+cargo run -p r14-cli -- init-contract
+
+# 4. Deposit
+cargo run -p r14-cli -- deposit 1000
+
+# 5. Start indexer (separate terminal)
+R14_CONTRACT_ID=<id> cargo run -p r14-indexer
+
+# 6. Check balance (after indexer syncs)
+cargo run -p r14-cli -- balance
+
+# 7. Transfer
+cargo run -p r14-cli -- transfer 700 <recipient_owner_hash>
 ```
 
-## Latest: Phase 2 — Circuit + Kernel Integration
+## Latest: Phase 3 — CLI + Indexer + Live E2E
 
 **Status: SHIPPED**
 
 **Deployed:**
-- Contract: `CDAXRSKM4VL4MPP7KNPNRDGEU6BWC4KXVXGT4RZ5TNHSQXHJCV3KVGMZ`
-- [Explorer](https://lab.stellar.org/r/testnet/contract/CDAXRSKM4VL4MPP7KNPNRDGEU6BWC4KXVXGT4RZ5TNHSQXHJCV3KVGMZ) (testnet)
+- Contract: `CDV6FRX7GFHZIRYB474LNW4325V7HYHD6WXBDHW4C2XEMCYPT4NF3GPN`
+- [Explorer](https://lab.stellar.org/r/testnet/contract/CDV6FRX7GFHZIRYB474LNW4325V7HYHD6WXBDHW4C2XEMCYPT4NF3GPN) (testnet)
 
 **Results:**
-- Transfer circuit: 7,638 constraints, 4 public inputs
-- WASM: 11.8KB optimized
-- 16 tests passing (9 kernel + 7 circuit)
-- E2E: off-chain Groth16 prove → on-chain verify
-- Double-spend prevention via nullifier storage
+- Full E2E: keygen → deposit → indexer sync → balance → transfer (verified on-chain)
+- 30 tests passing across 6 crates
+- WASM: 10.3KB (built with `stellar contract build`)
+- Indexer: event polling, SQLite persistence, Merkle tree rebuild, REST API
+- CLI: keygen, deposit, transfer (dry-run + live), balance, init-contract
 
 ## Crates
 
 ### [r14-kernel](crates/r14-kernel/) ✅
-**Soroban smart contract** — Groth16 verifier + transfer entrypoint
+**Soroban smart contract** — Groth16 verifier + deposit + transfer
 
-- `init(vk)` → store VK, `transfer(proof, ...)` → verify + nullifier check
+- `init(vk)` → store VK, `deposit(cm)` → emit event, `transfer(proof, ...)` → verify + nullifier check
 - BLS12-381 host functions: `g1_msm`, `pairing_check`
-- 11.8KB WASM, 9 tests
+- 10.3KB WASM, 9 tests
 
 [→ Read more](crates/r14-kernel/README.md)
 
@@ -181,53 +186,58 @@ stellar contract invoke \
 
 [→ Read more](crates/r14-circuit/README.md)
 
-### [r14-indexer](crates/r14-indexer/) 📦
-**Blockchain scanner** - Decrypts user notes
+### [r14-indexer](crates/r14-indexer/) ✅
+**Blockchain scanner** — Event watcher + Merkle tree + REST API
 
-- Scans contract events
-- Tries to decrypt with user viewing key
-- Builds local UTXO set
+- Polls Soroban RPC for deposit/transfer events
+- In-memory Poseidon Merkle tree (depth 20), SQLite persistence
+- REST API: `/v1/root`, `/v1/proof/:index`, `/v1/leaves`
+- Configurable via env vars: `R14_CONTRACT_ID`, `R14_RPC_URL`, `R14_DB_PATH`, `R14_LISTEN_ADDR`
+- 11 tests (5 tree + 1 E2E + 5 duplicate bin tests)
 
-### [r14-cli](crates/r14-cli/) 📦
-**User CLI** - Send/receive private transactions
+### [r14-cli](crates/r14-cli/) ✅
+**User CLI** — Full private transaction lifecycle
 
-- Key management
-- Proof generation
-- Transaction submission
+- `keygen` — generate secret key + owner_hash, create wallet
+- `deposit` — create note + submit commitment on-chain
+- `transfer` — select note, generate ZK proof, submit on-chain (or `--dry-run`)
+- `balance` — sync with indexer, show unspent notes
+- `init-contract` — initialize contract with verification key
+- Wallet stored at `~/.r14/wallet.json`
 
 ## How It Works
 
 ### Private Transfer Flow
 
 ```
-1. Alice wants to send 100 tokens to Bob
-   ├─► Selects her UTXO (note) from local state
-   ├─► Creates new note for Bob (encrypted)
-   └─► Generates ZK proof off-chain
+1. Alice deposits 1000 tokens
+   ├─► Creates note (value, owner, nonce) locally
+   ├─► Computes Poseidon commitment
+   └─► Submits commitment to contract (deposit event emitted)
 
-2. Proof proves (without revealing):
-   ├─► "I own a note in the commitment tree"
-   ├─► "I computed its nullifier correctly"
-   ├─► "New notes sum to same value"
-   └─► "Tree root updates correctly"
+2. Indexer picks up deposit
+   ├─► Inserts commitment into Merkle tree
+   ├─► Persists to SQLite
+   └─► Serves Merkle proofs via REST API
 
-3. Submit to r14-kernel contract:
-   ├─► Public: [old_root, new_root, nullifier]
-   ├─► Proof: 384 bytes
-   └─► Contract verifies → accepts/rejects
+3. Alice transfers 700 to Bob
+   ├─► Fetches Merkle proof from indexer
+   ├─► Generates ZK proof (proves ownership, value conservation)
+   └─► Submits proof + nullifier + new commitments to contract
 
-4. If accepted:
-   ├─► Nullifier stored (prevent double-spend)
-   ├─► New commitments added to tree
-   └─► Bob scans blockchain, decrypts his note
+4. Contract verifies
+   ├─► Groth16 pairing check (proof valid?)
+   ├─► Nullifier not already spent?
+   ├─► Mark nullifier spent, emit transfer event
+   └─► Indexer picks up new commitments
 ```
 
 ### Security Model
 
 - **Anonymity:** Sender/receiver hidden
-- **Confidentiality:** Amounts encrypted
+- **Confidentiality:** Amounts encrypted in notes
 - **Unlinkability:** Can't trace transaction graph
-- **Double-spend prevention:** Nullifier uniqueness enforced
+- **Double-spend prevention:** Nullifier uniqueness enforced on-chain
 - **Soundness:** Invalid proofs rejected (Groth16 security)
 
 ## Roadmap
@@ -235,12 +245,13 @@ stellar contract invoke \
 - [x] **Phase 0:** Feasibility spike (Groth16 + BLS12-381) — **SHIPPED**
 - [x] **Phase 1:** Shared primitives (r14-types + r14-poseidon) — **SHIPPED**
 - [x] **Phase 2:** Circuit + kernel integration — **SHIPPED**
-- [ ] **Phase 3:** CLI + Indexer
-  - [ ] `r14-cli`: keygen, deposit, transfer, balance
-  - [ ] `r14-indexer`: event watcher, Merkle tree, REST API
+- [x] **Phase 3:** CLI + Indexer + Live E2E — **SHIPPED**
 - [ ] **Phase 4:** Hardening
-  - [ ] Gas profiling, edge cases, view key compliance
-  - [ ] Admin auth, storage TTL, contractevent migration
+  - [ ] On-chain Merkle root tracking (prevent forged inclusion proofs)
+  - [ ] Admin auth on `init()`, storage TTL
+  - [ ] `#[contractevent]` migration
+  - [ ] Historical indexer backfill
+  - [ ] Recipient note discovery
 - [ ] **Phase 5:** Launch
   - [ ] Audits, trusted setup ceremony
   - [ ] Mainnet deployment
@@ -253,41 +264,46 @@ stellar contract invoke \
 - 7,638 R1CS constraints (transfer circuit)
 
 **On-Chain:**
-- Soroban smart contract
-- BLS12-381 host functions
-- Target: <80M instructions per verification
+- Soroban smart contract (10.3KB WASM)
+- BLS12-381 host functions (g1_msm, pairing_check)
+- 5 entrypoints: init, deposit, transfer, verify_proof, verify_dummy_proof
 
 **Merkle Tree:**
 - Depth: 20 (1M capacity)
 - Hash: Poseidon (ZK-friendly)
-- Sparse tree representation
+- Sparse tree, SQLite-backed persistence
 
 **Cryptography:**
-- Commitments: Poseidon hash
-- Nullifiers: Poseidon(commitment, sk)
-- Keys: EdDSA-like (BLS12-381 Fr scalars)
+- Commitments: Poseidon(value, app_tag, owner, nonce)
+- Nullifiers: Poseidon(secret_key, nonce)
+- Keys: BLS12-381 Fr scalars
+
+## Test Suite (30 tests)
+
+| Crate | Tests | What |
+|-------|-------|------|
+| r14-circuit | 7 | valid transfer, wrong sk, wrong path, value mismatch, app tag, constraints, serialization |
+| r14-kernel | 9 | dummy verify, wrong input, tampered proof (x2), test vectors, E2E transfer, double spend, invalid proof, wrong nullifier |
+| r14-poseidon | 6 | determinism, order, nullifier, commitment, nonce sensitivity |
+| r14-types | 2 | key gen, note creation |
+| r14-indexer | 11 | tree ops (x5), E2E flow, plus bin duplicates |
 
 ## Development
 
-### Run Tests
 ```bash
-cargo test --workspace
+cargo test --workspace          # all 30 tests
+stellar contract build -p r14-kernel  # build WASM
+cargo fmt --all                 # format
+cargo clippy --all-targets      # lint
 ```
 
-### Build WASM
-```bash
-cargo build --target wasm32-unknown-unknown --release
-```
+## Testnet Deployments
 
-### Format
-```bash
-cargo fmt --all
-```
-
-### Lint
-```bash
-cargo clippy --all-targets --all-features
-```
+| Phase | Contract | WASM | Date |
+|-------|----------|------|------|
+| Phase 3 | `CDV6FRX7GFHZIRYB474LNW4325V7HYHD6WXBDHW4C2XEMCYPT4NF3GPN` | 10.3KB | 2026-02-20 |
+| Phase 2 | `CDAXRSKM4VL4MPP7KNPNRDGEU6BWC4KXVXGT4RZ5TNHSQXHJCV3KVGMZ` | 11.8KB | 2026-02-19 |
+| Phase 0 | `CC4QPAKN2J6NUCW4QVW5ZA2BOUC4O4KUH6FMFANI34W2N7I7WGEKLZGW` | 6.2KB | 2026-02-17 |
 
 ## Resources
 
@@ -300,32 +316,20 @@ cargo clippy --all-targets --all-features
 - [arkworks](https://arkworks.rs/)
 - [Zcash Protocol Spec](https://zips.z.cash/protocol/protocol.pdf)
 
-**Privacy Coins:**
-- [Tornado Cash](https://tornado.cash/)
-- [Aztec Network](https://aztec.network/)
-- [Zcash](https://z.cash/)
-
-## Contributing
-
-1. Check Phase 0 results first
-2. Read [tech.md](tech.md) for full spec
-3. Pick a crate README for details
-4. Submit PR with tests
-
 ## License
 
 Apache-2.0
 
 ## Security
 
-⚠️ **Pre-alpha software** - Do not use with real funds
+**Pre-alpha software** — Do not use with real funds
 
-Phase 0 is a feasibility study. Production deployment requires:
+Production deployment requires:
 - [ ] Circuit audit
 - [ ] Contract audit
-- [ ] Trusted setup ceremony
+- [ ] Trusted setup ceremony (currently using seed=42)
+- [ ] On-chain Merkle root validation
 - [ ] Testnet stress testing
-- [ ] Economic security analysis
 
 ## Contact
 
@@ -333,4 +337,4 @@ Project maintained by [@abhirupbanerjee](https://github.com/abhirupbanerjee)
 
 ---
 
-**Current Status:** Phase 2 shipped — production circuit verified on testnet
+**Current Status:** Phase 3 shipped — full deposit → transfer → balance E2E on Stellar testnet

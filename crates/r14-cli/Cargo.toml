@@ -19,3 +19,10 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 hex = { workspace = true }
 rand = { workspace = true }
+ark-ff = { workspace = true }
+ark-bls12-381 = { workspace = true }
+ark-std = { workspace = true }
+ark-serialize = { workspace = true }
+ark-groth16 = { workspace = true }
+dirs = "6"
+anyhow = { workspace = true }

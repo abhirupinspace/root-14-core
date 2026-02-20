@@ -3,7 +3,13 @@ use ark_bls12_381::Fr;
 use r14_types::{MerklePath, Note};
 use serde::Deserialize;
 
+use ark_std::rand::{rngs::StdRng, SeedableRng};
+
 use crate::wallet::{crypto_rng, fr_to_hex, hex_to_fr, load_wallet, save_wallet, NoteEntry};
+
+fn strip_0x(s: &str) -> String {
+    s.strip_prefix("0x").unwrap_or(s).to_string()
+}
 
 #[derive(Deserialize)]
 struct ProofResponse {
@@ -79,9 +85,10 @@ pub async fn run(value: u64, recipient_hex: &str, dry_run: bool) -> Result<()> {
     let note_0 = Note::new(value, app_tag, recipient_fr, &mut rng);
     let note_1 = Note::new(change, app_tag, owner_fr, &mut rng);
 
-    // prove
+    // prove — deterministic seed for setup so pk matches on-chain vk
     println!("generating proof (this may take a few seconds)...");
-    let (pk, _vk) = r14_circuit::setup(&mut rng);
+    let setup_rng = &mut StdRng::seed_from_u64(42);
+    let (pk, _vk) = r14_circuit::setup(setup_rng);
     let (proof, pi) = r14_circuit::prove(
         &pk,
         sk_fr,
@@ -110,12 +117,42 @@ pub async fn run(value: u64, recipient_hex: &str, dry_run: bool) -> Result<()> {
             "out_commitment_1": fr_to_hex(&cm_1),
         });
         println!("{}", serde_json::to_string_pretty(&output)?);
+        return Ok(());
     } else {
-        // TODO: submit to Soroban via JSON-RPC (simulateTransaction + sendTransaction)
-        println!("soroban submission not yet implemented — use --dry-run");
-        println!("nullifier:        {}", fr_to_hex(&pi.nullifier));
-        println!("out_commitment_0: {}", fr_to_hex(&cm_0));
-        println!("out_commitment_1: {}", fr_to_hex(&cm_1));
+        if wallet.stellar_secret == "PLACEHOLDER" || wallet.contract_id == "PLACEHOLDER" {
+            anyhow::bail!("stellar_secret or contract_id not set in wallet.json");
+        }
+
+        println!("submitting transfer on-chain...");
+
+        // Build proof JSON for Soroban contracttype Proof { a: G1Affine, b: G2Affine, c: G1Affine }
+        let proof_json = format!(
+            r#"{{"a":"{}","b":"{}","c":"{}"}}"#,
+            serialized_proof.a, serialized_proof.b, serialized_proof.c
+        );
+
+        // Public inputs: old_root, nullifier, cm_0, cm_1 as hex (no 0x prefix)
+        let old_root_hex = strip_0x(&serialized_pi[0]);
+        let nullifier_hex = strip_0x(&serialized_pi[1]);
+        let cm_0_hex = strip_0x(&serialized_pi[2]);
+        let cm_1_hex = strip_0x(&serialized_pi[3]);
+
+        let result = crate::soroban::invoke_contract(
+            &wallet.contract_id,
+            "testnet",
+            &wallet.stellar_secret,
+            "transfer",
+            &[
+                ("proof", &proof_json),
+                ("old_root", &old_root_hex),
+                ("nullifier", &nullifier_hex),
+                ("cm_0", &cm_0_hex),
+                ("cm_1", &cm_1_hex),
+            ],
+        )
+        .await?;
+
+        println!("transfer submitted: {result}");
     }
 
     // update wallet: mark consumed as spent, add output notes

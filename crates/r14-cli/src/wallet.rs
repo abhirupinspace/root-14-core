@@ -19,6 +19,7 @@ pub fn crypto_rng() -> StdRng {
 pub struct WalletData {
     pub secret_key: String,
     pub owner_hash: String,
+    pub stellar_secret: String,
     pub notes: Vec<NoteEntry>,
     pub indexer_url: String,
     pub rpc_url: String,

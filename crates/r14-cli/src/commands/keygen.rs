@@ -16,6 +16,7 @@ pub fn run() -> Result<()> {
     let wallet = WalletData {
         secret_key: fr_to_hex(&sk.0),
         owner_hash: fr_to_hex(&owner.0),
+        stellar_secret: "PLACEHOLDER".into(),
         notes: vec![],
         indexer_url: "http://localhost:3000".into(),
         rpc_url: "https://soroban-testnet.stellar.org:443".into(),
@@ -25,5 +26,6 @@ pub fn run() -> Result<()> {
     save_wallet(&wallet)?;
     println!("wallet created at {}", path.display());
     println!("owner_hash: {}", wallet.owner_hash);
+    println!("\nnote: edit wallet.json to set stellar_secret and contract_id");
     Ok(())
 }

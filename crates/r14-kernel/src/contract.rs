@@ -47,6 +47,11 @@ impl R14Kernel {
         verify_groth16(&env, &vk, &proof, &public_inputs)
     }
 
+    /// Deposit a commitment into the pool (emits event for indexer)
+    pub fn deposit(env: Env, cm: BytesN<32>) {
+        env.events().publish(("deposit",), (cm,));
+    }
+
     /// Store verification key (one-time initialization)
     pub fn init(env: Env, vk: VerificationKey) {
         if env.storage().persistent().has(&DataKey::Vk) {

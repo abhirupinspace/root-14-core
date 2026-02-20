@@ -9,7 +9,6 @@ crate-type = ["cdylib", "rlib"]
 doctest = false
 
 [dependencies]
-r14-types = { workspace = true }
 soroban-sdk = { workspace = true }
 soroban-token-sdk = { workspace = true }
 

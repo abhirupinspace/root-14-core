@@ -1,0 +1,27 @@
+[package]
+name = "r14-transfer"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+doctest = false
+
+[dependencies]
+soroban-sdk = { workspace = true }
+
+[dev-dependencies]
+soroban-sdk = { workspace = true, features = ["testutils"] }
+r14-core = { workspace = true }
+r14-types = { workspace = true }
+ark-ff = { workspace = true }
+ark-bls12-381 = { workspace = true }
+ark-std = { workspace = true }
+hex = { workspace = true }
+r14-circuit = { workspace = true }
+r14-poseidon = { workspace = true }
+r14-sdk = { workspace = true }
+
+[features]
+testutils = ["soroban-sdk/testutils"]

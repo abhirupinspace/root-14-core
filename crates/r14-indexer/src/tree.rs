@@ -30,6 +30,10 @@ impl SparseMerkleTree {
         self.leaves.len()
     }
 
+    pub fn leaves(&self) -> &[Fr] {
+        &self.leaves
+    }
+
     pub fn root(&self) -> MerkleRoot {
         if self.leaves.is_empty() {
             return MerkleRoot(self.zeros[MERKLE_DEPTH]);

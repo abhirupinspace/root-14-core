@@ -18,6 +18,4 @@ ark-serialize = { workspace = true }
 ark-std = { workspace = true }
 ark-crypto-primitives = { workspace = true }
 rand = { workspace = true }
-
-[dependencies.hex]
-workspace = true
+r14-sdk = { workspace = true }

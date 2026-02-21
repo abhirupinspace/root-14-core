@@ -1,7 +1,7 @@
 use base64::{engine::general_purpose::STANDARD as B64, Engine};
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
-use stellar_xdr::curr::{Limits, ReadXdr, ScVal};
+use stellar_xdr::curr::{Limits, ReadXdr, ScMapEntry, ScVal};
 
 #[derive(Debug)]
 pub struct TransferEvent {
@@ -156,10 +156,10 @@ fn parse_transfer_value(value_b64: &str, ledger: u64) -> anyhow::Result<Transfer
     let sc_val = ScVal::from_xdr(&xdr_bytes, Limits::none())?;
 
     match sc_val {
-        ScVal::Vec(Some(vec)) if vec.len() == 3 => {
-            let nullifier = extract_bytes32(&vec[0], "nullifier")?;
-            let cm_0 = extract_bytes32(&vec[1], "cm_0")?;
-            let cm_1 = extract_bytes32(&vec[2], "cm_1")?;
+        ScVal::Map(Some(map)) => {
+            let nullifier = extract_bytes32_from_map(&map, "nullifier")?;
+            let cm_0 = extract_bytes32_from_map(&map, "cm_0")?;
+            let cm_1 = extract_bytes32_from_map(&map, "cm_1")?;
             Ok(TransferEvent {
                 nullifier,
                 cm_0,
@@ -169,6 +169,17 @@ fn parse_transfer_value(value_b64: &str, ledger: u64) -> anyhow::Result<Transfer
         }
         _ => Err(anyhow::anyhow!("unexpected event value shape: {sc_val:?}")),
     }
+}
+
+fn extract_bytes32_from_map(map: &stellar_xdr::curr::ScMap, key_name: &str) -> anyhow::Result<[u8; 32]> {
+    for entry in map.iter() {
+        if let ScVal::Symbol(sym) = &entry.key {
+            if sym.0.as_slice() == key_name.as_bytes() {
+                return extract_bytes32(&entry.val, key_name);
+            }
+        }
+    }
+    Err(anyhow::anyhow!("key '{key_name}' not found in map"))
 }
 
 fn extract_bytes32(val: &ScVal, name: &str) -> anyhow::Result<[u8; 32]> {
@@ -240,10 +251,10 @@ fn parse_deposit_value(value_b64: &str, ledger: u64) -> anyhow::Result<DepositEv
     let xdr_bytes = B64.decode(value_b64)?;
     let sc_val = ScVal::from_xdr(&xdr_bytes, Limits::none())?;
 
-    // deposit event value is a single-element tuple: (cm,)
+    // deposit event value is a #[contracttype] struct encoded as ScMap
     match sc_val {
-        ScVal::Vec(Some(vec)) if vec.len() == 1 => {
-            let cm = extract_bytes32(&vec[0], "cm")?;
+        ScVal::Map(Some(map)) => {
+            let cm = extract_bytes32_from_map(&map, "cm")?;
             Ok(DepositEvent { cm, ledger })
         }
         _ => Err(anyhow::anyhow!("unexpected deposit event value shape: {sc_val:?}")),

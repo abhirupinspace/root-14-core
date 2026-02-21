@@ -2,6 +2,7 @@ use anyhow::Result;
 use ark_ff::{BigInteger, PrimeField};
 use r14_types::Note;
 
+use crate::output;
 use crate::wallet::{crypto_rng, fr_to_hex, hex_to_fr, load_wallet, save_wallet, NoteEntry};
 
 /// Convert Fr to raw hex (no 0x prefix) for stellar CLI BytesN<32>
@@ -31,33 +32,70 @@ pub async fn run(value: u64, app_tag: u32, local_only: bool) -> Result<()> {
     wallet.notes.push(entry);
     save_wallet(&wallet)?;
 
-    println!("note created (local)");
-    println!("  value:      {}", value);
-    println!("  app_tag:    {}", app_tag);
-    println!("  commitment: {}", fr_to_hex(&cm));
+    let cm_hex_display = fr_to_hex(&cm);
 
     if local_only {
-        println!("\n--local-only: skipping on-chain submission");
+        if output::is_json() {
+            output::json_output(serde_json::json!({
+                "value": value,
+                "app_tag": app_tag,
+                "commitment": cm_hex_display,
+                "on_chain": false,
+            }));
+        } else {
+            output::success("note created (local)");
+            output::label("value", &value.to_string());
+            output::label("app_tag", &app_tag.to_string());
+            output::label("commitment", &cm_hex_display);
+            output::info("--local-only: skipping on-chain submission");
+        }
         return Ok(());
     }
 
-    if wallet.stellar_secret == "PLACEHOLDER" || wallet.contract_id == "PLACEHOLDER" {
-        println!("\nwarning: stellar_secret or contract_id not set in wallet.json");
-        println!("skipping on-chain submission — set them and re-run without --local-only");
+    // validation now in main.rs, but keep guard for direct calls
+    if wallet.stellar_secret == "PLACEHOLDER" || wallet.transfer_contract_id == "PLACEHOLDER" {
+        output::warn("stellar_secret or transfer_contract_id not set — skipping on-chain");
+        if output::is_json() {
+            output::json_output(serde_json::json!({
+                "value": value,
+                "app_tag": app_tag,
+                "commitment": cm_hex_display,
+                "on_chain": false,
+            }));
+        }
         return Ok(());
     }
 
-    println!("\nsubmitting deposit on-chain...");
     let cm_hex = fr_to_raw_hex(&cm);
+
+    let sp = output::spinner("computing new merkle root...");
+    let new_root_hex = crate::merkle::compute_new_root(&wallet.indexer_url, &[cm]).await?;
+    sp.finish_and_clear();
+
+    let sp = output::spinner("submitting deposit on-chain...");
     let result = crate::soroban::invoke_contract(
-        &wallet.contract_id,
+        &wallet.transfer_contract_id,
         "testnet",
         &wallet.stellar_secret,
         "deposit",
-        &[("cm", &cm_hex)],
+        &[("cm", &cm_hex), ("new_root", &new_root_hex)],
     )
     .await?;
+    sp.finish_and_clear();
 
-    println!("deposit submitted: {result}");
+    if output::is_json() {
+        output::json_output(serde_json::json!({
+            "value": value,
+            "app_tag": app_tag,
+            "commitment": cm_hex_display,
+            "on_chain": true,
+            "result": result,
+        }));
+    } else {
+        output::success("deposit submitted");
+        output::label("value", &value.to_string());
+        output::label("commitment", &cm_hex_display);
+        output::label("tx", &result);
+    }
     Ok(())
 }

@@ -2,7 +2,7 @@
 
 **Privacy-preserving transactions on Stellar using Groth16 zero-knowledge proofs**
 
-> **Phase 3 — CLI + Indexer + Live E2E**: Full deposit → transfer → balance flow working on Stellar testnet. 30 tests passing.
+> **Phase 3.5 — Standard Extraction**: r14-kernel split into r14-core (verifier registry) + r14-transfer (privacy app) + r14-sdk (serialization). Both contracts deployed to testnet. 39 tests passing.
 
 ## Overview
 
@@ -19,35 +19,41 @@ Users can transfer assets privately without revealing amounts, senders, or recei
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│                    Root14 System                        │
-├─────────────────────────────────────────────────────────┤
-│                                                         │
-│  ┌──────────────┐                  ┌────────────────┐  │
-│  │   Client     │                  │  r14-kernel    │  │
-│  │  (r14-cli)   │ ─── proof ────►  │  (Soroban)     │  │
-│  └──────────────┘                  └────────────────┘  │
-│         │                                   │          │
-│         │ generate                          │ verify   │
-│         ▼                                   ▼          │
-│  ┌──────────────┐                  ┌────────────────┐  │
-│  │  r14-circuit │                  │  BLS12-381     │  │
-│  │  (arkworks)  │                  │  host funcs    │  │
-│  └──────────────┘                  └────────────────┘  │
-│         │                                              │
-│         │ uses                                         │
-│         ▼                                              │
-│  ┌──────────────┐    ┌──────────────┐                  │
-│  │ r14-poseidon │    │  r14-types   │                  │
-│  │   (hash)     │    │   (shared)   │                  │
-│  └──────────────┘    └──────────────┘                  │
-│                                                         │
-│  ┌──────────────────────────────────────────────────┐  │
-│  │              r14-indexer                          │  │
-│  │  Event watcher → Merkle tree → REST API          │  │
-│  └──────────────────────────────────────────────────┘  │
-│                                                         │
-└─────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────┐
+│                      Root14 System                           │
+├──────────────────────────────────────────────────────────────┤
+│                                                              │
+│  ┌──────────────┐     ┌─────────────────────────────────┐   │
+│  │   Client     │     │  On-Chain (Soroban)              │   │
+│  │  (r14-cli)   │     │                                  │   │
+│  │              │     │  r14-core (6.6KB)                │   │
+│  │              │     │  ├── register(vk) → circuit_id   │   │
+│  │              │     │  └── verify(id, proof, inputs)   │   │
+│  │              │     │         ▲                         │   │
+│  │              │──►  │         │ cross-contract call     │   │
+│  │              │     │  r14-transfer (3.3KB)             │   │
+│  │              │     │  ├── deposit(cm)                  │   │
+│  └──────────────┘     │  └── transfer(proof, ...)        │   │
+│         │             └─────────────────────────────────┘   │
+│         │ generate                                           │
+│         ▼                                                    │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐      │
+│  │  r14-circuit │  │  r14-sdk     │  │  r14-types   │      │
+│  │  (arkworks)  │  │  (serialize) │  │  (shared)    │      │
+│  └──────────────┘  └──────────────┘  └──────────────┘      │
+│         │                                                    │
+│         ▼                                                    │
+│  ┌──────────────┐                                            │
+│  │ r14-poseidon │                                            │
+│  │   (hash)     │                                            │
+│  └──────────────┘                                            │
+│                                                              │
+│  ┌──────────────────────────────────────────────────────┐   │
+│  │              r14-indexer                              │   │
+│  │  Event watcher → Merkle tree → REST API              │   │
+│  └──────────────────────────────────────────────────────┘   │
+│                                                              │
+└──────────────────────────────────────────────────────────────┘
 ```
 
 ## Project Structure
@@ -55,7 +61,9 @@ Users can transfer assets privately without revealing amounts, senders, or recei
 ```
 r14-dev/
 ├── crates/
-│   ├── r14-kernel/         # ✅ Soroban contract (verifier + deposit + transfer)
+│   ├── r14-core/           # ✅ Soroban contract — general-purpose Groth16 verifier registry
+│   ├── r14-transfer/       # ✅ Soroban contract — private transfer app (calls r14-core)
+│   ├── r14-sdk/            # ✅ Arkworks → Soroban serialization helpers
 │   ├── r14-types/          # ✅ Shared types (Note, Nullifier, Keys, Merkle)
 │   ├── r14-poseidon/       # ✅ Poseidon hash (commitment, nullifier, owner)
 │   ├── r14-circuit/        # ✅ Off-chain proof generation (7,638 constraints)
@@ -64,10 +72,10 @@ r14-dev/
 │
 ├── docs and benchmarks/
 │   ├── tech.md                         # Technical specification
-│   ├── PHASE0_STATUS.md                # Phase 0 status (historical)
-│   ├── PHASE0_RESULTS.md               # Early testnet results (historical)
-│   ├── PHASE2_STATUS.md                # Phase 2 status
 │   └── TESTNET_DEPLOYMENT_SUMMARY.md   # All testnet deployments
+│
+├── research/
+│   └── extraction.md       # Standard extraction results + migration guide
 │
 ├── tasks/
 │   ├── todo.md             # Task tracker
@@ -99,67 +107,86 @@ stellar keys generate test-r14 --network testnet
 ### Build & Test
 
 ```bash
-# Run all tests (30 tests)
+# Run all tests (39 tests)
 cargo test --workspace
 
-# Build contract WASM
-stellar contract build --package r14-kernel
+# Build contract WASMs
+stellar contract build --package r14-core
+stellar contract build --package r14-transfer
 ```
 
 ### Deploy & Run E2E
 
 ```bash
-# 1. Deploy contract
+# 1. Deploy r14-core (verifier registry)
 stellar contract deploy \
-  --wasm target/wasm32v1-none/release/r14_kernel.wasm \
+  --wasm target/wasm32v1-none/release/r14_core.wasm \
   --network testnet --source test-r14
-# → returns CONTRACT_ID
+# → returns CORE_CONTRACT_ID
 
-# 2. Generate wallet
+# 2. Initialize r14-core with admin
+stellar contract invoke --id <CORE_CONTRACT_ID> \
+  --network testnet --source test-r14 \
+  -- init --admin <YOUR_ADDRESS>
+
+# 3. Register transfer circuit VK on r14-core
+#    (returns circuit_id)
+
+# 4. Deploy r14-transfer
+stellar contract deploy \
+  --wasm target/wasm32v1-none/release/r14_transfer.wasm \
+  --network testnet --source test-r14
+# → returns TRANSFER_CONTRACT_ID
+
+# 5. Initialize r14-transfer with core address + circuit_id
+stellar contract invoke --id <TRANSFER_CONTRACT_ID> \
+  --network testnet --source test-r14 \
+  -- init --core_contract <CORE_CONTRACT_ID> --circuit_id <CIRCUIT_ID>
+
+# 6. Generate wallet + deposit + transfer (via CLI)
 cargo run -p r14-cli -- keygen
-# Edit ~/.r14/wallet.json: set stellar_secret + contract_id
-
-# 3. Initialize VK on contract
-cargo run -p r14-cli -- init-contract
-
-# 4. Deposit
 cargo run -p r14-cli -- deposit 1000
-
-# 5. Start indexer (separate terminal)
-R14_CONTRACT_ID=<id> cargo run -p r14-indexer
-
-# 6. Check balance (after indexer syncs)
-cargo run -p r14-cli -- balance
-
-# 7. Transfer
 cargo run -p r14-cli -- transfer 700 <recipient_owner_hash>
 ```
 
-## Latest: Phase 3 — CLI + Indexer + Live E2E
+## Latest: Phase 3.5 — Standard Extraction
 
 **Status: SHIPPED**
 
-**Deployed:**
-- Contract: `CDV6FRX7GFHZIRYB474LNW4325V7HYHD6WXBDHW4C2XEMCYPT4NF3GPN`
-- [Explorer](https://lab.stellar.org/r/testnet/contract/CDV6FRX7GFHZIRYB474LNW4325V7HYHD6WXBDHW4C2XEMCYPT4NF3GPN) (testnet)
+**Deployed (testnet):**
+- r14-core: [`CA4UEWIHNJRNIAICTTINMNKBVYXMXMIGTVRSCB6YVOSWZ4WLSJY3ZNFS`](https://lab.stellar.org/r/testnet/contract/CA4UEWIHNJRNIAICTTINMNKBVYXMXMIGTVRSCB6YVOSWZ4WLSJY3ZNFS)
+- r14-transfer: [`CB57STZJ6DEFQAWRORLZKXO2IZ7ZJYBOVN5VBQ7RS4MEHRN4ZLNURBRU`](https://lab.stellar.org/r/testnet/contract/CB57STZJ6DEFQAWRORLZKXO2IZ7ZJYBOVN5VBQ7RS4MEHRN4ZLNURBRU)
 
 **Results:**
-- Full E2E: keygen → deposit → indexer sync → balance → transfer (verified on-chain)
-- 30 tests passing across 6 crates
-- WASM: 10.3KB (built with `stellar contract build`)
-- Indexer: event polling, SQLite persistence, Merkle tree rebuild, REST API
-- CLI: keygen, deposit, transfer (dry-run + live), balance, init-contract
+- Monolithic r14-kernel split into r14-core (verifier) + r14-transfer (app) + r14-sdk (serialization)
+- 39 tests passing across 8 crates
+- Combined WASM: 10.0KB (6.6KB + 3.3KB) — smaller than 10.3KB monolith
+- Cross-contract verification working on testnet
+- Transfer circuit registered, `is_registered` returns true
 
 ## Crates
 
-### [r14-kernel](crates/r14-kernel/) ✅
-**Soroban smart contract** — Groth16 verifier + deposit + transfer
+### [r14-core](crates/r14-core/) ✅
+**Soroban contract** — General-purpose Groth16 verifier registry
 
-- `init(vk)` → store VK, `deposit(cm)` → emit event, `transfer(proof, ...)` → verify + nullifier check
-- BLS12-381 host functions: `g1_msm`, `pairing_check`
-- 10.3KB WASM, 9 tests
+- `init(admin)`, `register(caller, vk) → circuit_id`, `verify(circuit_id, proof, inputs) → bool`
+- Content-addressed circuit_id via sha256 of VK bytes
+- Admin-gated registration, unified IC representation
+- 6.6KB WASM, 8 tests
 
-[→ Read more](crates/r14-kernel/README.md)
+### [r14-transfer](crates/r14-transfer/) ✅
+**Soroban contract** — Private transfer app (calls r14-core)
+
+- `init(core_addr, circuit_id)`, `deposit(cm)`, `transfer(proof, ...) → bool`
+- Cross-contract call to r14-core via `env.invoke_contract()`
+- Nullifier tracking, event emission for indexer
+- 3.3KB WASM, 4 tests
+
+### [r14-sdk](crates/r14-sdk/) ✅
+**Rust library** — Arkworks → Soroban serialization
+
+- `serialize_g1/g2/fr`, `serialize_vk_for_soroban`, `serialize_proof_for_soroban`
+- Handles LE→BE byte reversal for Fr scalars
 
 ### [r14-types](crates/r14-types/) ✅
 **Shared types** — Note, Nullifier, SecretKey, MerklePath
@@ -246,10 +273,11 @@ cargo run -p r14-cli -- transfer 700 <recipient_owner_hash>
 - [x] **Phase 1:** Shared primitives (r14-types + r14-poseidon) — **SHIPPED**
 - [x] **Phase 2:** Circuit + kernel integration — **SHIPPED**
 - [x] **Phase 3:** CLI + Indexer + Live E2E — **SHIPPED**
+- [x] **Phase 3.5:** Standard Extraction (r14-kernel → r14-core + r14-transfer + r14-sdk) — **SHIPPED**
 - [ ] **Phase 4:** Hardening
-  - [ ] On-chain Merkle root tracking (prevent forged inclusion proofs)
-  - [ ] Admin auth on `init()`, storage TTL
-  - [ ] `#[contractevent]` migration
+  - [ ] On-chain Merkle root tracking
+  - [ ] Storage TTL / `extend_ttl()`
+  - [ ] Update CLI for two-contract architecture
   - [ ] Historical indexer backfill
   - [ ] Recipient note discovery
 - [ ] **Phase 5:** Launch
@@ -264,9 +292,10 @@ cargo run -p r14-cli -- transfer 700 <recipient_owner_hash>
 - 7,638 R1CS constraints (transfer circuit)
 
 **On-Chain:**
-- Soroban smart contract (10.3KB WASM)
+- r14-core: 6.6KB WASM — verifier registry (init, register, verify, get_vk, is_registered)
+- r14-transfer: 3.3KB WASM — transfer app (init, deposit, transfer)
 - BLS12-381 host functions (g1_msm, pairing_check)
-- 5 entrypoints: init, deposit, transfer, verify_proof, verify_dummy_proof
+- Cross-contract verification via `env.invoke_contract()`
 
 **Merkle Tree:**
 - Depth: 20 (1M capacity)
@@ -278,32 +307,37 @@ cargo run -p r14-cli -- transfer 700 <recipient_owner_hash>
 - Nullifiers: Poseidon(secret_key, nonce)
 - Keys: BLS12-381 Fr scalars
 
-## Test Suite (30 tests)
+## Test Suite (39 tests)
 
 | Crate | Tests | What |
 |-------|-------|------|
+| r14-core | 8 | register+verify, wrong input, unregistered circuit, duplicate register, non-admin, is_registered, get_vk, proof generator |
+| r14-transfer | 4 | E2E transfer, double spend, invalid proof, wrong nullifier |
 | r14-circuit | 7 | valid transfer, wrong sk, wrong path, value mismatch, app tag, constraints, serialization |
-| r14-kernel | 9 | dummy verify, wrong input, tampered proof (x2), test vectors, E2E transfer, double spend, invalid proof, wrong nullifier |
 | r14-poseidon | 6 | determinism, order, nullifier, commitment, nonce sensitivity |
 | r14-types | 2 | key gen, note creation |
 | r14-indexer | 11 | tree ops (x5), E2E flow, plus bin duplicates |
+| r14-sdk | 1 | (implicit via r14-circuit re-exports) |
 
 ## Development
 
 ```bash
-cargo test --workspace          # all 30 tests
-stellar contract build -p r14-kernel  # build WASM
-cargo fmt --all                 # format
-cargo clippy --all-targets      # lint
+cargo test --workspace                    # all 39 tests
+stellar contract build -p r14-core        # build verifier WASM
+stellar contract build -p r14-transfer    # build transfer WASM
+cargo fmt --all                           # format
+cargo clippy --all-targets                # lint
 ```
 
 ## Testnet Deployments
 
 | Phase | Contract | WASM | Date |
 |-------|----------|------|------|
-| Phase 3 | `CDV6FRX7GFHZIRYB474LNW4325V7HYHD6WXBDHW4C2XEMCYPT4NF3GPN` | 10.3KB | 2026-02-20 |
-| Phase 2 | `CDAXRSKM4VL4MPP7KNPNRDGEU6BWC4KXVXGT4RZ5TNHSQXHJCV3KVGMZ` | 11.8KB | 2026-02-19 |
-| Phase 0 | `CC4QPAKN2J6NUCW4QVW5ZA2BOUC4O4KUH6FMFANI34W2N7I7WGEKLZGW` | 6.2KB | 2026-02-17 |
+| Extraction: r14-core | `CA4UEWIHNJRNIAICTTINMNKBVYXMXMIGTVRSCB6YVOSWZ4WLSJY3ZNFS` | 6.6KB | 2026-02-20 |
+| Extraction: r14-transfer | `CB57STZJ6DEFQAWRORLZKXO2IZ7ZJYBOVN5VBQ7RS4MEHRN4ZLNURBRU` | 3.3KB | 2026-02-20 |
+| Phase 3 (superseded) | `CDV6FRX7GFHZIRYB474LNW4325V7HYHD6WXBDHW4C2XEMCYPT4NF3GPN` | 10.3KB | 2026-02-20 |
+| Phase 2 (superseded) | `CDAXRSKM4VL4MPP7KNPNRDGEU6BWC4KXVXGT4RZ5TNHSQXHJCV3KVGMZ` | 11.8KB | 2026-02-19 |
+| Phase 0 (superseded) | `CC4QPAKN2J6NUCW4QVW5ZA2BOUC4O4KUH6FMFANI34W2N7I7WGEKLZGW` | 6.2KB | 2026-02-17 |
 
 ## Resources
 
@@ -337,4 +371,4 @@ Project maintained by [@abhirupbanerjee](https://github.com/abhirupbanerjee)
 
 ---
 
-**Current Status:** Phase 3 shipped — full deposit → transfer → balance E2E on Stellar testnet
+**Current Status:** Phase 3.5 shipped — r14-kernel split into r14-core + r14-transfer + r14-sdk, both contracts deployed to testnet with cross-contract verification working

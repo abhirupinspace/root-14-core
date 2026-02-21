@@ -1,6 +1,8 @@
 use anyhow::{Context, Result};
+use colored::Colorize;
 use serde::Deserialize;
 
+use crate::output;
 use crate::wallet::{load_wallet, save_wallet};
 
 #[derive(Deserialize)]
@@ -13,6 +15,8 @@ struct LeafResponse {
 pub async fn run() -> Result<()> {
     let mut wallet = load_wallet()?;
     let client = reqwest::Client::new();
+
+    let sp = output::spinner("syncing notes with indexer...");
 
     // sync unspent notes with indexer
     for note in wallet.notes.iter_mut().filter(|n| !n.spent) {
@@ -31,21 +35,41 @@ pub async fn run() -> Result<()> {
         }
     }
 
+    sp.finish_and_clear();
     save_wallet(&wallet).context("failed to save wallet after sync")?;
 
     // display
     let unspent: Vec<_> = wallet.notes.iter().filter(|n| !n.spent).collect();
     let total: u64 = unspent.iter().map(|n| n.value).sum();
 
-    println!("balance: {}", total);
-    if !unspent.is_empty() {
-        println!("\nunspent notes:");
-        for (i, n) in unspent.iter().enumerate() {
-            let status = match n.index {
-                Some(idx) => format!("on-chain (idx={})", idx),
-                None => "local-only".into(),
-            };
-            println!("  [{}] value={} app_tag={} {}", i, n.value, n.app_tag, status);
+    if output::is_json() {
+        let notes_json: Vec<_> = unspent
+            .iter()
+            .map(|n| {
+                serde_json::json!({
+                    "value": n.value,
+                    "app_tag": n.app_tag,
+                    "commitment": n.commitment,
+                    "index": n.index,
+                    "status": if n.index.is_some() { "on-chain" } else { "local-only" },
+                })
+            })
+            .collect();
+        output::json_output(serde_json::json!({
+            "balance": total,
+            "notes": notes_json,
+        }));
+    } else {
+        output::label("balance", &total.to_string());
+        if !unspent.is_empty() {
+            output::info("\nunspent notes:");
+            for (i, n) in unspent.iter().enumerate() {
+                let status = match n.index {
+                    Some(idx) => format!("{} (idx={})", "on-chain".green(), idx),
+                    None => "local-only".yellow().to_string(),
+                };
+                output::info(&format!("  [{}] value={} app_tag={} {}", i, n.value, n.app_tag, status));
+            }
         }
     }
 

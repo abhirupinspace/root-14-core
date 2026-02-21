@@ -29,6 +29,7 @@ pub fn router(state: SharedState) -> Router {
         .route("/v1/root", get(get_root))
         .route("/v1/proof/{index}", get(get_proof))
         .route("/v1/leaf/{commitment}", get(get_leaf))
+        .route("/v1/leaves", get(get_leaves))
         .layer(CorsLayer::permissive())
         .with_state(state)
 }
@@ -88,6 +89,12 @@ async fn get_leaf(
             Json(json!({ "error": e.to_string() })),
         )),
     }
+}
+
+async fn get_leaves(State(state): State<SharedState>) -> impl IntoResponse {
+    let s = state.read().await;
+    let leaves: Vec<String> = s.tree.leaves().iter().map(fr_to_hex).collect();
+    Json(json!({ "leaves": leaves }))
 }
 
 fn fr_to_hex(fr: &Fr) -> String {

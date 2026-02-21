@@ -1,0 +1,11 @@
+[package]
+name = "r14-sdk"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+ark-bls12-381 = { workspace = true }
+ark-groth16 = { workspace = true }
+ark-serialize = { workspace = true }
+hex = { workspace = true }

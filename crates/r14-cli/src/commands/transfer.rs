@@ -5,6 +5,7 @@ use serde::Deserialize;
 
 use ark_std::rand::{rngs::StdRng, SeedableRng};
 
+use crate::output;
 use crate::wallet::{crypto_rng, fr_to_hex, hex_to_fr, load_wallet, save_wallet, NoteEntry};
 
 fn strip_0x(s: &str) -> String {
@@ -86,7 +87,7 @@ pub async fn run(value: u64, recipient_hex: &str, dry_run: bool) -> Result<()> {
     let note_1 = Note::new(change, app_tag, owner_fr, &mut rng);
 
     // prove — deterministic seed for setup so pk matches on-chain vk
-    println!("generating proof (this may take a few seconds)...");
+    let sp = output::spinner("generating proof (this may take a few seconds)...");
     let setup_rng = &mut StdRng::seed_from_u64(42);
     let (pk, _vk) = r14_circuit::setup(setup_rng);
     let (proof, pi) = r14_circuit::prove(
@@ -97,6 +98,7 @@ pub async fn run(value: u64, recipient_hex: &str, dry_run: bool) -> Result<()> {
         [note_0.clone(), note_1.clone()],
         &mut rng,
     );
+    sp.finish_and_clear();
 
     let (serialized_proof, serialized_pi) =
         r14_circuit::serialize_proof_for_soroban(&proof, &pi);
@@ -105,7 +107,7 @@ pub async fn run(value: u64, recipient_hex: &str, dry_run: bool) -> Result<()> {
     let cm_1 = r14_poseidon::commitment(&note_1);
 
     if dry_run {
-        let output = serde_json::json!({
+        let dry_output = serde_json::json!({
             "proof": {
                 "a": serialized_proof.a,
                 "b": serialized_proof.b,
@@ -116,44 +118,59 @@ pub async fn run(value: u64, recipient_hex: &str, dry_run: bool) -> Result<()> {
             "out_commitment_0": fr_to_hex(&cm_0),
             "out_commitment_1": fr_to_hex(&cm_1),
         });
-        println!("{}", serde_json::to_string_pretty(&output)?);
-        return Ok(());
-    } else {
-        if wallet.stellar_secret == "PLACEHOLDER" || wallet.contract_id == "PLACEHOLDER" {
-            anyhow::bail!("stellar_secret or contract_id not set in wallet.json");
+        if output::is_json() {
+            output::json_output(dry_output);
+        } else {
+            println!("{}", serde_json::to_string_pretty(&dry_output)?);
         }
-
-        println!("submitting transfer on-chain...");
-
-        // Build proof JSON for Soroban contracttype Proof { a: G1Affine, b: G2Affine, c: G1Affine }
-        let proof_json = format!(
-            r#"{{"a":"{}","b":"{}","c":"{}"}}"#,
-            serialized_proof.a, serialized_proof.b, serialized_proof.c
-        );
-
-        // Public inputs: old_root, nullifier, cm_0, cm_1 as hex (no 0x prefix)
-        let old_root_hex = strip_0x(&serialized_pi[0]);
-        let nullifier_hex = strip_0x(&serialized_pi[1]);
-        let cm_0_hex = strip_0x(&serialized_pi[2]);
-        let cm_1_hex = strip_0x(&serialized_pi[3]);
-
-        let result = crate::soroban::invoke_contract(
-            &wallet.contract_id,
-            "testnet",
-            &wallet.stellar_secret,
-            "transfer",
-            &[
-                ("proof", &proof_json),
-                ("old_root", &old_root_hex),
-                ("nullifier", &nullifier_hex),
-                ("cm_0", &cm_0_hex),
-                ("cm_1", &cm_1_hex),
-            ],
-        )
-        .await?;
-
-        println!("transfer submitted: {result}");
+        return Ok(());
     }
+
+    // validation now in main.rs, but keep guard for direct calls
+    if wallet.stellar_secret == "PLACEHOLDER" || wallet.transfer_contract_id == "PLACEHOLDER" {
+        return Err(output::fail_with_hint(
+            "stellar_secret or transfer_contract_id not set",
+            "run `r14 config set <key> <value>`",
+        ));
+    }
+
+    // Build proof JSON for Soroban contracttype Proof { a: G1Affine, b: G2Affine, c: G1Affine }
+    let proof_json = format!(
+        r#"{{"a":"{}","b":"{}","c":"{}"}}"#,
+        serialized_proof.a, serialized_proof.b, serialized_proof.c
+    );
+
+    // Public inputs: old_root, nullifier, cm_0, cm_1 as hex (no 0x prefix)
+    let old_root_hex = strip_0x(&serialized_pi[0]);
+    let nullifier_hex = strip_0x(&serialized_pi[1]);
+    let cm_0_hex = strip_0x(&serialized_pi[2]);
+    let cm_1_hex = strip_0x(&serialized_pi[3]);
+
+    let sp = output::spinner("computing new merkle root...");
+    let new_root_hex = crate::merkle::compute_new_root(
+        &wallet.indexer_url,
+        &[cm_0, cm_1],
+    )
+    .await?;
+    sp.finish_and_clear();
+
+    let sp = output::spinner("submitting transfer on-chain...");
+    let result = crate::soroban::invoke_contract(
+        &wallet.transfer_contract_id,
+        "testnet",
+        &wallet.stellar_secret,
+        "transfer",
+        &[
+            ("proof", &proof_json),
+            ("old_root", &old_root_hex),
+            ("nullifier", &nullifier_hex),
+            ("cm_0", &cm_0_hex),
+            ("cm_1", &cm_1_hex),
+            ("new_root", &new_root_hex),
+        ],
+    )
+    .await?;
+    sp.finish_and_clear();
 
     // update wallet: mark consumed as spent, add output notes
     wallet.notes[note_idx].spent = true;
@@ -179,6 +196,21 @@ pub async fn run(value: u64, recipient_hex: &str, dry_run: bool) -> Result<()> {
     });
 
     save_wallet(&wallet)?;
-    println!("wallet updated");
+
+    if output::is_json() {
+        output::json_output(serde_json::json!({
+            "value": value,
+            "recipient": recipient_hex,
+            "nullifier": fr_to_hex(&pi.nullifier),
+            "out_commitment_0": fr_to_hex(&cm_0),
+            "out_commitment_1": fr_to_hex(&cm_1),
+            "result": result,
+        }));
+    } else {
+        output::success("transfer submitted");
+        output::label("value", &value.to_string());
+        output::label("nullifier", &fr_to_hex(&pi.nullifier));
+        output::label("tx", &result);
+    }
     Ok(())
 }

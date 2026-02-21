@@ -26,3 +26,5 @@ ark-serialize = { workspace = true }
 ark-groth16 = { workspace = true }
 dirs = "6"
 anyhow = { workspace = true }
+colored = "3"
+indicatif = "0.17"

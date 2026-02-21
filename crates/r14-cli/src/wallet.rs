@@ -23,7 +23,8 @@ pub struct WalletData {
     pub notes: Vec<NoteEntry>,
     pub indexer_url: String,
     pub rpc_url: String,
-    pub contract_id: String,
+    pub core_contract_id: String,
+    pub transfer_contract_id: String,
 }
 
 #[derive(Serialize, Deserialize, Clone)]

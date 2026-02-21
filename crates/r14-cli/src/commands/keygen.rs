@@ -1,6 +1,7 @@
 use anyhow::Result;
 use r14_types::SecretKey;
 
+use crate::output;
 use crate::wallet::{crypto_rng, fr_to_hex, save_wallet, wallet_path, WalletData};
 
 pub fn run() -> Result<()> {
@@ -20,12 +21,21 @@ pub fn run() -> Result<()> {
         notes: vec![],
         indexer_url: "http://localhost:3000".into(),
         rpc_url: "https://soroban-testnet.stellar.org:443".into(),
-        contract_id: "PLACEHOLDER".into(),
+        core_contract_id: "PLACEHOLDER".into(),
+        transfer_contract_id: "PLACEHOLDER".into(),
     };
 
     save_wallet(&wallet)?;
-    println!("wallet created at {}", path.display());
-    println!("owner_hash: {}", wallet.owner_hash);
-    println!("\nnote: edit wallet.json to set stellar_secret and contract_id");
+
+    if output::is_json() {
+        output::json_output(serde_json::json!({
+            "wallet_path": path.display().to_string(),
+            "owner_hash": wallet.owner_hash,
+        }));
+    } else {
+        output::success(&format!("wallet created at {}", path.display()));
+        output::label("owner_hash", &wallet.owner_hash);
+        output::warn("run `r14 config set stellar_secret <SECRET>` to configure");
+    }
     Ok(())
 }

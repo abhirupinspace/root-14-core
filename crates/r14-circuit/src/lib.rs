@@ -2,10 +2,9 @@ pub mod merkle_gadget;
 pub mod poseidon_gadget;
 pub mod transfer;
 
-use ark_bls12_381::{Bls12_381, Fr, G1Affine, G2Affine};
+use ark_bls12_381::{Bls12_381, Fr};
 use ark_groth16::{Groth16, PreparedVerifyingKey, ProvingKey, VerifyingKey};
 use ark_relations::r1cs::{ConstraintSynthesizer, ConstraintSystem};
-use ark_serialize::CanonicalSerialize;
 use ark_snark::SNARK;
 use ark_std::rand::{CryptoRng, RngCore};
 use r14_types::{MerklePath, Note};
@@ -98,62 +97,19 @@ pub fn constraint_count() -> usize {
     cs.num_constraints()
 }
 
-// === Serialization for Soroban ===
+// === Serialization for Soroban (delegated to r14-sdk) ===
 
-pub struct SerializedVK {
-    pub alpha_g1: String,
-    pub beta_g2: String,
-    pub gamma_g2: String,
-    pub delta_g2: String,
-    pub ic: Vec<String>,
-}
+pub use r14_sdk::{
+    serialize_fr, serialize_g1, serialize_g2, serialize_vk_for_soroban, SerializedProof,
+    SerializedVK,
+};
 
-pub struct SerializedProof {
-    pub a: String,
-    pub b: String,
-    pub c: String,
-}
-
-fn serialize_g1(point: &G1Affine) -> String {
-    let mut bytes = Vec::new();
-    point.serialize_uncompressed(&mut bytes).unwrap();
-    hex::encode(&bytes)
-}
-
-fn serialize_g2(point: &G2Affine) -> String {
-    let mut bytes = Vec::new();
-    point.serialize_uncompressed(&mut bytes).unwrap();
-    hex::encode(&bytes)
-}
-
-fn serialize_fr(fr: &Fr) -> String {
-    let mut bytes = Vec::new();
-    fr.serialize_compressed(&mut bytes).unwrap();
-    bytes.reverse(); // LE -> BE for Soroban
-    hex::encode(&bytes)
-}
-
-pub fn serialize_vk_for_soroban(vk: &VerifyingKey<Bls12_381>) -> SerializedVK {
-    SerializedVK {
-        alpha_g1: serialize_g1(&vk.alpha_g1),
-        beta_g2: serialize_g2(&vk.beta_g2),
-        gamma_g2: serialize_g2(&vk.gamma_g2),
-        delta_g2: serialize_g2(&vk.delta_g2),
-        ic: vk.gamma_abc_g1.iter().map(serialize_g1).collect(),
-    }
-}
-
+/// Convenience wrapper that accepts PublicInputs (calls r14_sdk internally)
 pub fn serialize_proof_for_soroban(
     proof: &ark_groth16::Proof<Bls12_381>,
     public_inputs: &PublicInputs,
 ) -> (SerializedProof, Vec<String>) {
-    let sp = SerializedProof {
-        a: serialize_g1(&proof.a),
-        b: serialize_g2(&proof.b),
-        c: serialize_g1(&proof.c),
-    };
-    let pi: Vec<String> = public_inputs.to_vec().iter().map(serialize_fr).collect();
-    (sp, pi)
+    r14_sdk::serialize_proof_for_soroban(proof, &public_inputs.to_vec())
 }
 
 #[cfg(test)]

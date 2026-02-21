@@ -2,8 +2,10 @@
 resolver = "2"
 members = [
     "crates/r14-types",
-    "crates/r14-kernel",
     "crates/r14-poseidon",
+    "crates/r14-sdk",
+    "crates/r14-core",
+    "crates/r14-transfer",
     "crates/r14-circuit",
     "crates/r14-indexer",
     "crates/r14-cli",
@@ -18,6 +20,9 @@ license = "Apache-2.0"
 # Shared
 r14-types = { path = "crates/r14-types" }
 r14-poseidon = { path = "crates/r14-poseidon" }
+r14-sdk = { path = "crates/r14-sdk" }
+r14-core = { path = "crates/r14-core" }
+r14-transfer = { path = "crates/r14-transfer" }
 r14-circuit = { path = "crates/r14-circuit" }
 
 # Soroban

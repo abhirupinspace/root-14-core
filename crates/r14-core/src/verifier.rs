@@ -20,16 +20,18 @@ pub fn verify_groth16(
 ) -> bool {
     let bls = env.crypto().bls12_381();
 
+    let ic_0: G1Affine = vk.ic.get(0).expect("VK must have at least ic[0]");
+
     // Step 1: Compute L = IC[0] + MSM(IC[1..], public_inputs)
     let l = if public_inputs.is_empty() {
-        vk.ic_0.clone()
+        ic_0
     } else {
-        let msm_result = bls.g1_msm(vk.ic_rest.clone(), public_inputs.clone());
-        bls.g1_add(&vk.ic_0, &msm_result)
+        let ic_rest: Vec<G1Affine> = vk.ic.slice(1..);
+        let msm_result = bls.g1_msm(ic_rest, public_inputs.clone());
+        bls.g1_add(&ic_0, &msm_result)
     };
 
     // Step 2: Negate G1 points via scalar mul by -1
-    // Fr::from_bytes uses U256::from_be_bytes
     let zero = Fr::from_bytes(BytesN::from_array(env, &[0u8; 32]));
     let one = Fr::from_bytes(BytesN::from_array(env, &{
         let mut b = [0u8; 32];

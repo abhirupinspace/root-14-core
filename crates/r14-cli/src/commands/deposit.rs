@@ -1,9 +1,9 @@
 use anyhow::Result;
 use ark_ff::{BigInteger, PrimeField};
-use r14_types::Note;
+use r14_sdk::{commitment, Note};
+use r14_sdk::wallet::{crypto_rng, fr_to_hex, hex_to_fr, load_wallet, save_wallet, NoteEntry};
 
 use crate::output;
-use crate::wallet::{crypto_rng, fr_to_hex, hex_to_fr, load_wallet, save_wallet, NoteEntry};
 
 /// Convert Fr to raw hex (no 0x prefix) for stellar CLI BytesN<32>
 fn fr_to_raw_hex(fr: &ark_bls12_381::Fr) -> String {
@@ -17,7 +17,7 @@ pub async fn run(value: u64, app_tag: u32, local_only: bool) -> Result<()> {
 
     let mut rng = crypto_rng();
     let note = Note::new(value, app_tag, owner, &mut rng);
-    let cm = r14_poseidon::commitment(&note);
+    let cm = commitment(&note);
 
     let entry = NoteEntry {
         value: note.value,
@@ -69,11 +69,11 @@ pub async fn run(value: u64, app_tag: u32, local_only: bool) -> Result<()> {
     let cm_hex = fr_to_raw_hex(&cm);
 
     let sp = output::spinner("computing new merkle root...");
-    let new_root_hex = crate::merkle::compute_new_root(&wallet.indexer_url, &[cm]).await?;
+    let new_root_hex = r14_sdk::merkle::compute_new_root(&wallet.indexer_url, &[cm]).await?;
     sp.finish_and_clear();
 
     let sp = output::spinner("submitting deposit on-chain...");
-    let result = crate::soroban::invoke_contract(
+    let result = r14_sdk::soroban::invoke_contract(
         &wallet.transfer_contract_id,
         "testnet",
         &wallet.stellar_secret,

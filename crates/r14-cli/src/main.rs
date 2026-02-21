@@ -1,10 +1,8 @@
 mod commands;
-pub mod merkle;
 pub mod output;
-pub mod soroban;
-pub mod wallet;
 
 use clap::{Parser, Subcommand};
+use r14_sdk::wallet;
 
 #[derive(Parser)]
 #[command(name = "r14", about = "Private transfer CLI for Stellar")]
@@ -120,6 +118,7 @@ async fn main() -> anyhow::Result<()> {
         }
         Cmd::Balance => commands::balance::run().await?,
         Cmd::ComputeRoot { commitments } => {
+            use r14_sdk::merkle;
             if commitments.is_empty() {
                 println!("{}", merkle::empty_root_hex());
             } else {

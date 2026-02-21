@@ -9,8 +9,7 @@ name = "r14"
 path = "src/main.rs"
 
 [dependencies]
-r14-types = { workspace = true, features = ["std"] }
-r14-poseidon = { workspace = true }
+r14-sdk = { workspace = true }
 r14-circuit = { path = "../r14-circuit" }
 clap = { workspace = true }
 reqwest = { workspace = true }
@@ -24,7 +23,6 @@ ark-bls12-381 = { workspace = true }
 ark-std = { workspace = true }
 ark-serialize = { workspace = true }
 ark-groth16 = { workspace = true }
-dirs = "6"
 anyhow = { workspace = true }
 colored = "3"
 indicatif = "0.17"

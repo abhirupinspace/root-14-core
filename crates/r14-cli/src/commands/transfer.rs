@@ -1,12 +1,12 @@
 use anyhow::{Context, Result};
 use ark_bls12_381::Fr;
-use r14_types::{MerklePath, Note};
+use r14_sdk::{commitment, MerklePath, Note};
+use r14_sdk::wallet::{crypto_rng, fr_to_hex, hex_to_fr, load_wallet, save_wallet, NoteEntry};
 use serde::Deserialize;
 
 use ark_std::rand::{rngs::StdRng, SeedableRng};
 
 use crate::output;
-use crate::wallet::{crypto_rng, fr_to_hex, hex_to_fr, load_wallet, save_wallet, NoteEntry};
 
 fn strip_0x(s: &str) -> String {
     s.strip_prefix("0x").unwrap_or(s).to_string()
@@ -103,8 +103,8 @@ pub async fn run(value: u64, recipient_hex: &str, dry_run: bool) -> Result<()> {
     let (serialized_proof, serialized_pi) =
         r14_circuit::serialize_proof_for_soroban(&proof, &pi);
 
-    let cm_0 = r14_poseidon::commitment(&note_0);
-    let cm_1 = r14_poseidon::commitment(&note_1);
+    let cm_0 = commitment(&note_0);
+    let cm_1 = commitment(&note_1);
 
     if dry_run {
         let dry_output = serde_json::json!({
@@ -147,7 +147,7 @@ pub async fn run(value: u64, recipient_hex: &str, dry_run: bool) -> Result<()> {
     let cm_1_hex = strip_0x(&serialized_pi[3]);
 
     let sp = output::spinner("computing new merkle root...");
-    let new_root_hex = crate::merkle::compute_new_root(
+    let new_root_hex = r14_sdk::merkle::compute_new_root(
         &wallet.indexer_url,
         &[cm_0, cm_1],
     )
@@ -155,7 +155,7 @@ pub async fn run(value: u64, recipient_hex: &str, dry_run: bool) -> Result<()> {
     sp.finish_and_clear();
 
     let sp = output::spinner("submitting transfer on-chain...");
-    let result = crate::soroban::invoke_contract(
+    let result = r14_sdk::soroban::invoke_contract(
         &wallet.transfer_contract_id,
         "testnet",
         &wallet.stellar_secret,

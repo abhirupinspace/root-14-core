@@ -2364,12 +2364,10 @@ dependencies = [
  "ark-std 0.5.0",
  "clap",
  "colored",
- "dirs",
  "hex",
  "indicatif",
  "r14-circuit",
- "r14-poseidon",
- "r14-types",
+ "r14-sdk",
  "rand 0.10.0",
  "reqwest",
  "serde",
@@ -2439,10 +2437,20 @@ dependencies = [
 name = "r14-sdk"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "ark-bls12-381 0.5.0",
+ "ark-ff 0.5.0",
  "ark-groth16",
  "ark-serialize 0.5.0",
+ "ark-std 0.5.0",
+ "dirs",
  "hex",
+ "r14-poseidon",
+ "r14-types",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "tokio",
 ]
 
 [[package]]

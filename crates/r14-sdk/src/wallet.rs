@@ -1,3 +1,30 @@
+// Copyright 2026 abhirupbanerjee
+// Licensed under the Apache License, Version 2.0
+
+//! Wallet persistence and field-element ↔ hex conversion.
+//!
+//! Stores keys, notes, and config as JSON at `~/.r14/wallet.json`.
+//!
+//! # Hex format
+//!
+//! [`fr_to_hex`] produces `0x`-prefixed big-endian hex (66 chars).
+//! [`hex_to_fr`] accepts both `0x`-prefixed and raw hex, and zero-pads
+//! short inputs to 32 bytes.
+//!
+//! # Example
+//!
+//! ```rust,no_run
+//! use r14_sdk::wallet::{load_wallet, save_wallet, fr_to_hex, hex_to_fr};
+//!
+//! # fn example() -> anyhow::Result<()> {
+//! let mut w = load_wallet()?;
+//! let owner_fr = hex_to_fr(&w.owner_hash)?;
+//! // ... use owner_fr in note creation ...
+//! save_wallet(&w)?;
+//! # Ok(())
+//! # }
+//! ```
+
 use anyhow::{Context, Result};
 use ark_bls12_381::Fr;
 use ark_ff::{BigInteger, PrimeField};
@@ -87,4 +114,57 @@ pub fn hex_to_fr(s: &str) -> Result<Fr> {
         })
     ).unwrap();
     Fr::from_bigint(bigint).context("value not in field")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ark_ff::UniformRand;
+    use ark_std::rand::{rngs::StdRng, SeedableRng};
+
+    #[test]
+    fn fr_hex_roundtrip() {
+        let mut rng = StdRng::seed_from_u64(99);
+        for _ in 0..10 {
+            let original = Fr::rand(&mut rng);
+            let hex = fr_to_hex(&original);
+            let recovered = hex_to_fr(&hex).unwrap();
+            assert_eq!(original, recovered);
+        }
+    }
+
+    #[test]
+    fn hex_to_fr_no_prefix() {
+        let mut rng = StdRng::seed_from_u64(42);
+        let val = Fr::rand(&mut rng);
+        let hex_with = fr_to_hex(&val); // "0x..."
+        let hex_without = hex_with.strip_prefix("0x").unwrap();
+        assert_eq!(hex_to_fr(&hex_with).unwrap(), hex_to_fr(hex_without).unwrap());
+    }
+
+    #[test]
+    fn hex_to_fr_zero() {
+        let fr = hex_to_fr("0x0000000000000000000000000000000000000000000000000000000000000000").unwrap();
+        assert_eq!(fr, Fr::from(0u64));
+    }
+
+    #[test]
+    fn hex_to_fr_one() {
+        let fr = hex_to_fr("0x0000000000000000000000000000000000000000000000000000000000000001").unwrap();
+        assert_eq!(fr, Fr::from(1u64));
+    }
+
+    #[test]
+    fn hex_to_fr_short_input() {
+        // short hex (< 32 bytes) should be zero-padded
+        let fr = hex_to_fr("01").unwrap();
+        assert_eq!(fr, Fr::from(1u64));
+    }
+
+    #[test]
+    fn fr_to_hex_has_0x_prefix() {
+        let hex = fr_to_hex(&Fr::from(42u64));
+        assert!(hex.starts_with("0x"));
+        assert_eq!(hex.len(), 66); // "0x" + 64 hex chars
+    }
 }

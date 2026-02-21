@@ -2,7 +2,7 @@ use anyhow::Result;
 use ark_std::rand::{rngs::StdRng, SeedableRng};
 
 use crate::output;
-use crate::wallet::load_wallet;
+use r14_sdk::wallet::load_wallet;
 
 pub async fn run() -> Result<()> {
     let wallet = load_wallet()?;
@@ -34,11 +34,11 @@ pub async fn run() -> Result<()> {
     );
 
     // Derive caller address from stellar secret
-    let caller_address = crate::soroban::get_public_key(&wallet.stellar_secret).await?;
+    let caller_address = r14_sdk::soroban::get_public_key(&wallet.stellar_secret).await?;
 
     // Step 1: Register VK on r14-core
     let sp = output::spinner("registering VK on r14-core...");
-    let circuit_id = crate::soroban::invoke_contract(
+    let circuit_id = r14_sdk::soroban::invoke_contract(
         &wallet.core_contract_id,
         "testnet",
         &wallet.stellar_secret,
@@ -51,10 +51,10 @@ pub async fn run() -> Result<()> {
     output::info(&format!("VK registered, circuit_id: {circuit_id}"));
 
     // Step 2: Initialize r14-transfer with core address, circuit_id, empty root
-    let empty_root_hex = crate::merkle::empty_root_hex();
+    let empty_root_hex = r14_sdk::merkle::empty_root_hex();
 
     let sp = output::spinner("initializing r14-transfer...");
-    let result = crate::soroban::invoke_contract(
+    let result = r14_sdk::soroban::invoke_contract(
         &wallet.transfer_contract_id,
         "testnet",
         &wallet.stellar_secret,

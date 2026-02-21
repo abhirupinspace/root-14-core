@@ -1,3 +1,31 @@
+// Copyright 2026 abhirupbanerjee
+// Licensed under the Apache License, Version 2.0
+
+//! Soroban contract invocation via the `stellar` CLI.
+//!
+//! Wraps the `stellar` binary for key derivation and contract calls.
+//! Requires the [Stellar CLI](https://github.com/stellar/stellar-cli)
+//! to be installed and available on `$PATH`.
+//!
+//! # Example
+//!
+//! ```rust,no_run
+//! # async fn example() -> anyhow::Result<()> {
+//! // derive public key from secret
+//! let pubkey = r14_sdk::soroban::get_public_key("S_SECRET...").await?;
+//!
+//! // invoke a contract function
+//! let result = r14_sdk::soroban::invoke_contract(
+//!     "C_CONTRACT_ID",
+//!     "testnet",
+//!     "S_SECRET...",
+//!     "deposit",
+//!     &[("cm", "deadbeef..."), ("new_root", "cafebabe...")],
+//! ).await?;
+//! # Ok(())
+//! # }
+//! ```
+
 use anyhow::{Context, Result};
 use tokio::process::Command;
 

@@ -1,7 +1,7 @@
 use anyhow::Result;
 
 use crate::output;
-use crate::wallet::{load_wallet, save_wallet};
+use r14_sdk::wallet::{load_wallet, save_wallet};
 
 const ALLOWED_KEYS: &[&str] = &[
     "rpc_url",

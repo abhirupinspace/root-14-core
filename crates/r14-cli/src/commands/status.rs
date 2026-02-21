@@ -2,7 +2,7 @@ use anyhow::Result;
 use colored::Colorize;
 
 use crate::output;
-use crate::wallet::{load_wallet, wallet_path};
+use r14_sdk::wallet::{load_wallet, wallet_path};
 
 pub async fn run() -> Result<()> {
     let path = wallet_path()?;

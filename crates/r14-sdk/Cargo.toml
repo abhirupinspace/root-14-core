@@ -5,7 +5,17 @@ edition.workspace = true
 license.workspace = true
 
 [dependencies]
+r14-types = { workspace = true, features = ["std"] }
+r14-poseidon = { workspace = true }
 ark-bls12-381 = { workspace = true }
+ark-ff = { workspace = true }
 ark-groth16 = { workspace = true }
 ark-serialize = { workspace = true }
+ark-std = { workspace = true }
 hex = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+reqwest = { workspace = true }
+tokio = { workspace = true }
+dirs = "6"
+anyhow = { workspace = true }

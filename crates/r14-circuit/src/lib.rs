@@ -99,7 +99,7 @@ pub fn constraint_count() -> usize {
 
 // === Serialization for Soroban (delegated to r14-sdk) ===
 
-pub use r14_sdk::{
+pub use r14_sdk::serialize::{
     serialize_fr, serialize_g1, serialize_g2, serialize_vk_for_soroban, SerializedProof,
     SerializedVK,
 };
@@ -109,7 +109,7 @@ pub fn serialize_proof_for_soroban(
     proof: &ark_groth16::Proof<Bls12_381>,
     public_inputs: &PublicInputs,
 ) -> (SerializedProof, Vec<String>) {
-    r14_sdk::serialize_proof_for_soroban(proof, &public_inputs.to_vec())
+    r14_sdk::serialize::serialize_proof_for_soroban(proof, &public_inputs.to_vec())
 }
 
 #[cfg(test)]

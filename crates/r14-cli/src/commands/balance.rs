@@ -3,7 +3,7 @@ use colored::Colorize;
 use serde::Deserialize;
 
 use crate::output;
-use crate::wallet::{load_wallet, save_wallet};
+use r14_sdk::wallet::{load_wallet, save_wallet};
 
 #[derive(Deserialize)]
 struct LeafResponse {

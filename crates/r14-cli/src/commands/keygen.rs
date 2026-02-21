@@ -1,8 +1,8 @@
 use anyhow::Result;
-use r14_types::SecretKey;
+use r14_sdk::{owner_hash, SecretKey};
+use r14_sdk::wallet::{crypto_rng, fr_to_hex, save_wallet, wallet_path, WalletData};
 
 use crate::output;
-use crate::wallet::{crypto_rng, fr_to_hex, save_wallet, wallet_path, WalletData};
 
 pub fn run() -> Result<()> {
     let path = wallet_path()?;
@@ -12,7 +12,7 @@ pub fn run() -> Result<()> {
 
     let mut rng = crypto_rng();
     let sk = SecretKey::random(&mut rng);
-    let owner = r14_poseidon::owner_hash(&sk);
+    let owner = owner_hash(&sk);
 
     let wallet = WalletData {
         secret_key: fr_to_hex(&sk.0),

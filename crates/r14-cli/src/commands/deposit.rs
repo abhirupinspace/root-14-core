@@ -1,15 +1,8 @@
 use anyhow::Result;
-use ark_ff::{BigInteger, PrimeField};
-use r14_sdk::{commitment, Note};
+use r14_sdk::{commitment, fr_to_raw_hex, Note};
 use r14_sdk::wallet::{crypto_rng, fr_to_hex, hex_to_fr, load_wallet, save_wallet, NoteEntry};
 
 use crate::output;
-
-/// Convert Fr to raw hex (no 0x prefix) for stellar CLI BytesN<32>
-fn fr_to_raw_hex(fr: &ark_bls12_381::Fr) -> String {
-    let bytes = fr.into_bigint().to_bytes_be();
-    hex::encode(bytes)
-}
 
 pub async fn run(value: u64, app_tag: u32, local_only: bool) -> Result<()> {
     let mut wallet = load_wallet()?;
@@ -48,20 +41,6 @@ pub async fn run(value: u64, app_tag: u32, local_only: bool) -> Result<()> {
             output::label("app_tag", &app_tag.to_string());
             output::label("commitment", &cm_hex_display);
             output::info("--local-only: skipping on-chain submission");
-        }
-        return Ok(());
-    }
-
-    // validation now in main.rs, but keep guard for direct calls
-    if wallet.stellar_secret == "PLACEHOLDER" || wallet.transfer_contract_id == "PLACEHOLDER" {
-        output::warn("stellar_secret or transfer_contract_id not set — skipping on-chain");
-        if output::is_json() {
-            output::json_output(serde_json::json!({
-                "value": value,
-                "app_tag": app_tag,
-                "commitment": cm_hex_display,
-                "on_chain": false,
-            }));
         }
         return Ok(());
     }

@@ -19,13 +19,16 @@
 //! | [`merkle`] | Offline and indexer-backed Merkle root computation |
 //! | [`soroban`] | Stellar CLI wrapper for on-chain contract invocation |
 //! | [`serialize`] | Arkworks → hex serialization for Soroban contracts |
+//! | `prove` | ZK proof generation (feature-gated, requires `prove` feature) |
 //!
 //! ## Quick start
 //!
 //! ```toml
 //! [dependencies]
-//! r14-sdk     = { path = "crates/r14-sdk" }
-//! r14-circuit = { path = "crates/r14-circuit" }   # for proof generation
+//! r14-sdk = { path = "crates/r14-sdk" }
+//!
+//! # Enable proof generation (pulls in r14-circuit):
+//! # r14-sdk = { path = "crates/r14-sdk", features = ["prove"] }
 //! ```
 //!
 //! ## Typical integration flow
@@ -60,8 +63,8 @@
 //! // 4. Compute Merkle root (offline or via indexer)
 //! let root = r14_sdk::merkle::compute_root_from_leaves(&[cm]);
 //!
-//! // 5. Generate proof (via r14-circuit — separate crate)
-//! //    let (proof, pi) = r14_circuit::prove(&pk, sk, note, path, outputs, &mut rng);
+//! // 5. Generate proof (enable `prove` feature)
+//! //    let (proof, pi) = r14_sdk::prove::prove(&pk, sk, note, path, outputs, &mut rng);
 //!
 //! // 6. Serialize for Soroban
 //! //    let (sp, spi) = r14_sdk::serialize::serialize_proof_for_soroban(&proof, &pi_vec);
@@ -78,7 +81,18 @@ pub use r14_types::{MerklePath, MerkleRoot, Note, Nullifier, SecretKey, MERKLE_D
 // Re-exports from r14-poseidon
 pub use r14_poseidon::{commitment, hash2, nullifier, owner_hash};
 
+pub mod client;
+pub mod error;
 pub mod merkle;
+#[cfg(feature = "prove")]
+pub mod prove;
 pub mod serialize;
 pub mod soroban;
 pub mod wallet;
+
+pub use client::{
+    R14Client, R14Contracts, BalanceResult, DepositResult, InitResult, NoteStatus, PrebuiltProof,
+    TransferResult,
+};
+pub use error::{R14Error, R14Result};
+pub use wallet::{fr_to_raw_hex, strip_0x};

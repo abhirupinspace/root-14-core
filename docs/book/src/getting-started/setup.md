@@ -2,12 +2,14 @@
 
 ## Dependencies
 
-Add `r14-sdk` to your `Cargo.toml`. If you also need proof generation, add `r14-circuit`.
+Add `r14-sdk` to your `Cargo.toml`. Enable the `prove` feature for ZK proof generation.
 
 ```toml
 [dependencies]
-r14-sdk     = { path = "crates/r14-sdk" }
-r14-circuit = { path = "crates/r14-circuit" }  # only if you need proof generation
+r14-sdk = { path = "crates/r14-sdk" }
+
+# Include proof generation (pulls in r14-circuit automatically):
+# r14-sdk = { path = "crates/r14-sdk", features = ["prove"] }
 ```
 
 `r14-sdk` re-exports `r14-types` and `r14-poseidon` — you don't need to depend on them directly.
@@ -21,11 +23,11 @@ r14-circuit = { path = "crates/r14-circuit" }  # only if you need proof generati
 - Proof/VK serialization for Soroban
 - On-chain contract invocation
 
-## What requires `r14-circuit`
+## What requires the `prove` feature
 
-- Groth16 trusted setup (`setup()`)
-- Proof generation (`prove()`)
-- Off-chain proof verification (`verify_offchain()`)
+- Groth16 trusted setup (`r14_sdk::prove::setup()`)
+- Proof generation (`r14_sdk::prove::prove()`)
+- Off-chain proof verification (`r14_sdk::prove::verify_offchain()`)
 
 ## Runtime requirements
 

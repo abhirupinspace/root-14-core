@@ -7,6 +7,7 @@ members = [
     "crates/r14-core",
     "crates/r14-transfer",
     "crates/r14-circuit",
+    "crates/r14-circuits",
     "crates/r14-indexer",
     "crates/r14-cli",
 ]
@@ -24,6 +25,7 @@ r14-sdk = { path = "crates/r14-sdk" }
 r14-core = { path = "crates/r14-core" }
 r14-transfer = { path = "crates/r14-transfer" }
 r14-circuit = { path = "crates/r14-circuit" }
+r14-circuits = { path = "crates/r14-circuits" }
 
 # Soroban
 soroban-sdk = "25.1.1"

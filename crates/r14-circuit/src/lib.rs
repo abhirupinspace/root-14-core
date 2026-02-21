@@ -97,21 +97,6 @@ pub fn constraint_count() -> usize {
     cs.num_constraints()
 }
 
-// === Serialization for Soroban (delegated to r14-sdk) ===
-
-pub use r14_sdk::serialize::{
-    serialize_fr, serialize_g1, serialize_g2, serialize_vk_for_soroban, SerializedProof,
-    SerializedVK,
-};
-
-/// Convenience wrapper that accepts PublicInputs (calls r14_sdk internally)
-pub fn serialize_proof_for_soroban(
-    proof: &ark_groth16::Proof<Bls12_381>,
-    public_inputs: &PublicInputs,
-) -> (SerializedProof, Vec<String>) {
-    r14_sdk::serialize::serialize_proof_for_soroban(proof, &public_inputs.to_vec())
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -231,8 +216,8 @@ mod tests {
         let (pk, vk) = setup(&mut rng);
         let (proof, pi) = prove(&pk, sk, consumed, path, created, &mut rng);
 
-        let svk = serialize_vk_for_soroban(&vk);
-        let (sp, spi) = serialize_proof_for_soroban(&proof, &pi);
+        let svk = r14_sdk::serialize::serialize_vk_for_soroban(&vk);
+        let (sp, spi) = r14_sdk::serialize::serialize_proof_for_soroban(&proof, &pi.to_vec());
 
         // IC length = 5 (1 constant + 4 public inputs)
         assert_eq!(svk.ic.len(), 5, "IC length should be 5 for 4 public inputs");

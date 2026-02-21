@@ -21,10 +21,10 @@ pub async fn run() -> Result<()> {
     // Deterministic setup — same seed=42 used everywhere
     let sp = output::spinner("setting up circuit...");
     let mut rng = StdRng::seed_from_u64(42);
-    let (_pk, vk) = r14_circuit::setup(&mut rng);
+    let (_pk, vk) = r14_sdk::prove::setup(&mut rng);
     sp.finish_and_clear();
 
-    let svk = r14_circuit::serialize_vk_for_soroban(&vk);
+    let svk = r14_sdk::prove::serialize_vk_for_soroban(&vk);
 
     // Build VK JSON matching the Soroban contract's unified IC format
     let ic_entries: Vec<String> = svk.ic.iter().map(|s| format!("\"{}\"", s)).collect();

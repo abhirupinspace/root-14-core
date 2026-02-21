@@ -5,7 +5,7 @@ use clap::{Parser, Subcommand};
 use r14_sdk::wallet;
 
 #[derive(Parser)]
-#[command(name = "r14", about = "Private transfer CLI for Stellar")]
+#[command(name = "r14", about = "Private transfer CLI for Stellar", version)]
 struct Cli {
     #[command(subcommand)]
     command: Cmd,
@@ -119,14 +119,19 @@ async fn main() -> anyhow::Result<()> {
         Cmd::Balance => commands::balance::run().await?,
         Cmd::ComputeRoot { commitments } => {
             use r14_sdk::merkle;
-            if commitments.is_empty() {
-                println!("{}", merkle::empty_root_hex());
+            let root = if commitments.is_empty() {
+                merkle::empty_root_hex()
             } else {
                 let leaves: Vec<ark_bls12_381::Fr> = commitments
                     .iter()
                     .map(|h| wallet::hex_to_fr(h))
                     .collect::<anyhow::Result<_>>()?;
-                println!("{}", merkle::compute_root_from_leaves(&leaves));
+                merkle::compute_root_from_leaves(&leaves)
+            };
+            if cli.json {
+                output::json_output(serde_json::json!({ "root": root }));
+            } else {
+                output::info(&root);
             }
         }
         Cmd::Status => commands::status::run().await?,

@@ -26,7 +26,7 @@
 
 use anyhow::{Context, Result};
 use ark_bls12_381::Fr;
-use ark_ff::{AdditiveGroup, BigInteger, PrimeField};
+use ark_ff::AdditiveGroup;
 use r14_poseidon::hash2;
 use r14_types::MERKLE_DEPTH;
 
@@ -106,9 +106,8 @@ pub async fn compute_new_root(
     Ok(fr_to_raw_hex(&root))
 }
 
-/// Fr to raw hex (no 0x prefix) for Soroban BytesN<32>
 fn fr_to_raw_hex(fr: &Fr) -> String {
-    hex::encode(fr.into_bigint().to_bytes_be())
+    crate::wallet::fr_to_raw_hex(fr)
 }
 
 /// Compute root from leaves and return as raw hex (no 0x prefix)

@@ -4,7 +4,7 @@
 //! Unit tests for r14-core contract: register, verify, get_vk, is_registered
 
 use r14_core::{Proof, R14Core, R14CoreClient, VerificationKey};
-use r14_sdk::{serialize_proof_for_soroban, serialize_vk_for_soroban, SerializedProof, SerializedVK};
+use r14_sdk::serialize::{serialize_proof_for_soroban, serialize_vk_for_soroban, SerializedProof, SerializedVK};
 use soroban_sdk::crypto::bls12_381::{Fr, G1Affine, G2Affine};
 use soroban_sdk::{testutils::Address as _, Address, BytesN, Env, Vec};
 

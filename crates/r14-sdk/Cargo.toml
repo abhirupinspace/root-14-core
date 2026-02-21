@@ -1,5 +1,6 @@
 [package]
 name = "r14-sdk"
+description = "Client SDK for Root14 private transactions on Stellar"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -19,3 +20,10 @@ reqwest = { workspace = true }
 tokio = { workspace = true }
 dirs = "6"
 anyhow = { workspace = true }
+thiserror = "2"
+
+# Optional — enable `prove` feature for ZK proof generation
+r14-circuit = { workspace = true, optional = true }
+
+[features]
+prove = ["dep:r14-circuit"]

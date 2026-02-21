@@ -23,6 +23,7 @@
 - [merkle](./api/merkle.md)
 - [soroban](./api/soroban.md)
 - [serialize](./api/serialize.md)
+- [prove](./api/prove.md)
 
 # Reference
 

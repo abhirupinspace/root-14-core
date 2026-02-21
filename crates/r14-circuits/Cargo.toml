@@ -1,6 +1,6 @@
 [package]
-name = "r14-circuit"
-description = "Transfer circuit (Groth16/BLS12-381) for Root14"
+name = "r14-circuits"
+description = "Pre-built ZK circuits for Root14 (preimage, ownership, membership, range)"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -8,17 +8,12 @@ license.workspace = true
 [dependencies]
 r14-types = { workspace = true, features = ["std"] }
 r14-poseidon = { workspace = true }
-ark-ff = { workspace = true }
-ark-ec = { workspace = true }
+r14-circuit = { workspace = true }
 ark-bls12-381 = { workspace = true }
+ark-ff = { workspace = true }
 ark-groth16 = { workspace = true }
 ark-r1cs-std = { workspace = true }
 ark-relations = { workspace = true }
 ark-snark = { workspace = true }
-ark-serialize = { workspace = true }
 ark-std = { workspace = true }
 ark-crypto-primitives = { workspace = true }
-rand = { workspace = true }
-
-[dev-dependencies]
-r14-sdk = { workspace = true }

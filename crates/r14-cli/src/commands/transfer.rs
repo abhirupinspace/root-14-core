@@ -6,11 +6,9 @@ use serde::Deserialize;
 
 use ark_std::rand::{rngs::StdRng, SeedableRng};
 
-use crate::output;
+use r14_sdk::strip_0x;
 
-fn strip_0x(s: &str) -> String {
-    s.strip_prefix("0x").unwrap_or(s).to_string()
-}
+use crate::output;
 
 #[derive(Deserialize)]
 struct ProofResponse {
@@ -89,8 +87,8 @@ pub async fn run(value: u64, recipient_hex: &str, dry_run: bool) -> Result<()> {
     // prove — deterministic seed for setup so pk matches on-chain vk
     let sp = output::spinner("generating proof (this may take a few seconds)...");
     let setup_rng = &mut StdRng::seed_from_u64(42);
-    let (pk, _vk) = r14_circuit::setup(setup_rng);
-    let (proof, pi) = r14_circuit::prove(
+    let (pk, _vk) = r14_sdk::prove::setup(setup_rng);
+    let (proof, pi) = r14_sdk::prove::prove(
         &pk,
         sk_fr,
         consumed.clone(),
@@ -101,7 +99,7 @@ pub async fn run(value: u64, recipient_hex: &str, dry_run: bool) -> Result<()> {
     sp.finish_and_clear();
 
     let (serialized_proof, serialized_pi) =
-        r14_circuit::serialize_proof_for_soroban(&proof, &pi);
+        r14_sdk::prove::serialize_proof_for_soroban(&proof, &pi.to_vec());
 
     let cm_0 = commitment(&note_0);
     let cm_1 = commitment(&note_1);
@@ -124,14 +122,6 @@ pub async fn run(value: u64, recipient_hex: &str, dry_run: bool) -> Result<()> {
             println!("{}", serde_json::to_string_pretty(&dry_output)?);
         }
         return Ok(());
-    }
-
-    // validation now in main.rs, but keep guard for direct calls
-    if wallet.stellar_secret == "PLACEHOLDER" || wallet.transfer_contract_id == "PLACEHOLDER" {
-        return Err(output::fail_with_hint(
-            "stellar_secret or transfer_contract_id not set",
-            "run `r14 config set <key> <value>`",
-        ));
     }
 
     // Build proof JSON for Soroban contracttype Proof { a: G1Affine, b: G2Affine, c: G1Affine }

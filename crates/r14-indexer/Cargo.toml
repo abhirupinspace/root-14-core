@@ -1,5 +1,6 @@
 [package]
 name = "r14-indexer"
+description = "Event indexer and Merkle tree service for Root14"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

@@ -67,10 +67,11 @@ pub fn serialize_g2(point: &G2Affine) -> String {
 /// Serialize Fr to big-endian hex (32 bytes = 64 hex chars)
 ///
 /// arkworks uses LE serialization; Soroban Fr::from_bytes expects BE.
+/// serialize_compressed gives LE bytes; reverse to BE for Soroban Fr::from_bytes.
 pub fn serialize_fr(fr: &Fr) -> String {
     let mut bytes = Vec::new();
     fr.serialize_compressed(&mut bytes).unwrap();
-    bytes.reverse(); // LE -> BE for Soroban
+    bytes.reverse();
     hex::encode(&bytes)
 }
 

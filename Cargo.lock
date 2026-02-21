@@ -2353,6 +2353,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "r14-circuits"
+version = "0.1.0"
+dependencies = [
+ "ark-bls12-381 0.5.0",
+ "ark-crypto-primitives",
+ "ark-ff 0.5.0",
+ "ark-groth16",
+ "ark-r1cs-std",
+ "ark-relations",
+ "ark-snark",
+ "ark-std 0.5.0",
+ "r14-circuit",
+ "r14-poseidon",
+ "r14-types",
+]
+
+[[package]]
 name = "r14-cli"
 version = "0.1.0"
 dependencies = [
@@ -2366,7 +2383,6 @@ dependencies = [
  "colored",
  "hex",
  "indicatif",
- "r14-circuit",
  "r14-sdk",
  "rand 0.10.0",
  "reqwest",
@@ -2445,11 +2461,13 @@ dependencies = [
  "ark-std 0.5.0",
  "dirs",
  "hex",
+ "r14-circuit",
  "r14-poseidon",
  "r14-types",
  "reqwest",
  "serde",
  "serde_json",
+ "thiserror 2.0.18",
  "tokio",
 ]
 

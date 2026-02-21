@@ -1,5 +1,6 @@
 [package]
 name = "r14-poseidon"
+description = "Poseidon hash for Root14 ZK circuits"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

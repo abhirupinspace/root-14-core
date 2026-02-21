@@ -33,6 +33,7 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
 
+/// Timestamp-seeded RNG for note nonces only — NOT a CSPRNG.
 pub fn crypto_rng() -> StdRng {
     StdRng::seed_from_u64(
         std::time::SystemTime::now()
@@ -96,13 +97,15 @@ pub fn fr_to_hex(fr: &Fr) -> String {
 pub fn hex_to_fr(s: &str) -> Result<Fr> {
     let s = s.strip_prefix("0x").unwrap_or(s);
     let bytes = hex::decode(s).context("invalid hex")?;
-    // pad to 32 bytes
+
+    // 1. Zero-pad BE hex bytes to exactly 32 bytes
     let mut padded = vec![0u8; 32 - bytes.len().min(32)];
     padded.extend_from_slice(&bytes[..bytes.len().min(32)]);
+
+    // 2. Convert 32 BE bytes → 4 LE u64 limbs (rchunks iterates low bytes first)
     let bigint = <Fr as PrimeField>::BigInt::try_from(
         ark_ff::BigInt::<4>::new({
             let mut limbs = [0u64; 4];
-            // BE bytes -> LE limbs
             for (i, chunk) in padded.rchunks(8).enumerate() {
                 if i >= 4 { break; }
                 let mut buf = [0u8; 8];
@@ -113,7 +116,19 @@ pub fn hex_to_fr(s: &str) -> Result<Fr> {
             limbs
         })
     ).unwrap();
+
+    // 3. Construct Fr, rejecting values >= field modulus
     Fr::from_bigint(bigint).context("value not in field")
+}
+
+/// Fr → raw hex (no 0x prefix, 64 chars). For Soroban BytesN<32>.
+pub fn fr_to_raw_hex(fr: &Fr) -> String {
+    hex::encode(fr.into_bigint().to_bytes_be())
+}
+
+/// Strip leading "0x" prefix if present.
+pub fn strip_0x(s: &str) -> String {
+    s.strip_prefix("0x").unwrap_or(s).to_string()
 }
 
 #[cfg(test)]

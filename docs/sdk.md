@@ -8,8 +8,10 @@ Client library for **Root14** — the ZK privacy standard for Stellar.
 
 ```toml
 [dependencies]
-r14-sdk     = { path = "crates/r14-sdk" }
-r14-circuit = { path = "crates/r14-circuit" }  # only if you need proof generation
+r14-sdk = { path = "crates/r14-sdk" }
+
+# Include proof generation (pulls in r14-circuit automatically):
+# r14-sdk = { path = "crates/r14-sdk", features = ["prove"] }
 ```
 
 `r14-sdk` re-exports `r14-types` and `r14-poseidon` — you don't need to depend on them directly.
@@ -26,8 +28,8 @@ r14-circuit = { path = "crates/r14-circuit" }  # only if you need proof generati
 │  └──────────┘ └────────┘ └────────┘ └────────┘ │
 │  re-exports: SecretKey, Note, commitment, ...   │
 ├─────────────────────────────────────────────────┤
-│  r14-circuit (optional)                         │
-│  setup() · prove() · verify_offchain()          │
+│  r14-sdk feature "prove" (optional)              │
+│  prove::setup() · prove::prove() · ...          │
 ├─────────────────────────────────────────────────┤
 │  Stellar / Soroban                              │
 │  r14-core contract · r14-transfer contract      │
@@ -43,6 +45,7 @@ r14-circuit = { path = "crates/r14-circuit" }  # only if you need proof generati
 | `merkle` | Offline and indexer-backed Merkle root computation |
 | `soroban` | Stellar CLI wrapper for on-chain contract calls |
 | `serialize` | Groth16 proof/VK → hex for Soroban contracts |
+| `prove` | ZK proof generation (feature-gated) |
 
 ## Core concepts
 

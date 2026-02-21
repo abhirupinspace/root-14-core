@@ -12,8 +12,8 @@
 │  └──────────┘ └────────┘ └────────┘ └────────┘ │
 │  re-exports: SecretKey, Note, commitment, ...   │
 ├─────────────────────────────────────────────────┤
-│  r14-circuit (optional)                         │
-│  setup() · prove() · verify_offchain()          │
+│  r14-sdk feature "prove" (optional)              │
+│  prove::setup() · prove::prove() · ...          │
 ├─────────────────────────────────────────────────┤
 │  Stellar / Soroban                              │
 │  r14-core contract · r14-transfer contract      │
@@ -29,6 +29,7 @@
 | `merkle` | Sparse Merkle tree root computation — offline from leaf list or live via indexer |
 | `soroban` | Thin async wrapper around the `stellar` CLI for contract invocation |
 | `serialize` | Converts arkworks Groth16 types (G1, G2, Fr, VK, Proof) into hex strings for Soroban |
+| `prove` | ZK proof generation — feature-gated, enable with `features = ["prove"]` |
 
 ## Data flow: deposit
 
@@ -61,7 +62,7 @@ fetch merkle proof from indexer ──→ MerklePath
 build output notes (recipient + change)
         │
         ▼
-r14_circuit::prove(sk, consumed, path, outputs)
+r14_sdk::prove::prove(sk, consumed, path, outputs)
         │
         ▼
 serialize_proof_for_soroban ──→ hex strings

@@ -5,7 +5,7 @@
 //! Deploy r14-core + r14-transfer, register VK, then transfer
 
 use r14_core::{R14Core, R14CoreClient, VerificationKey};
-use r14_sdk::{serialize_proof_for_soroban, serialize_vk_for_soroban, SerializedProof, SerializedVK};
+use r14_sdk::serialize::{serialize_proof_for_soroban, serialize_vk_for_soroban, SerializedProof, SerializedVK};
 use r14_transfer::{Proof, R14Transfer, R14TransferClient};
 use soroban_sdk::crypto::bls12_381::{G1Affine, G2Affine};
 use soroban_sdk::{testutils::Address as _, Address, BytesN, Env, Vec};
